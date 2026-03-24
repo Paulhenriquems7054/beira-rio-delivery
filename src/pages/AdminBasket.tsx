@@ -13,7 +13,6 @@ export default function AdminBasket() {
   const [newProductPrice, setNewProductPrice] = useState("");
   const [newProductQuantity, setNewProductQuantity] = useState("1");
   const [newProductUnit, setNewProductUnit] = useState("un");
-  const [newProductFile, setNewProductFile] = useState<File | null>(null);
   const [basketName, setBasketName] = useState("");
   const [basketPrice, setBasketPrice] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -79,23 +78,6 @@ export default function AdminBasket() {
         throw new Error("Preencha todos os campos corretamente");
       }
 
-      let fileUrl = null;
-      if (newProductFile) {
-        try {
-          const fileExt = newProductFile.name.split('.').pop();
-          const filePath = `${Date.now()}.${fileExt}`;
-          const { data, error } = await supabase.storage.from('arquivos').upload(filePath, newProductFile);
-          if (data) {
-             const { data: publicUrlData } = supabase.storage.from('arquivos').getPublicUrl(filePath);
-             fileUrl = publicUrlData.publicUrl;
-          } else {
-             fileUrl = newProductFile.name;
-          }
-        } catch {
-             fileUrl = newProductFile.name;
-        }
-      }
-
       // 1. Criar o produto
       const { data: prodData, error: prodErr } = await supabase
         .from("products")
@@ -103,8 +85,7 @@ export default function AdminBasket() {
            name: newProductName, 
            price: priceVal, 
            unit: newProductUnit, 
-           active: true,
-           image_url: fileUrl
+           active: true
         }])
         .select()
         .single();
@@ -124,10 +105,40 @@ export default function AdminBasket() {
       setNewProductPrice("");
       setNewProductQuantity("1");
       setNewProductUnit("un");
-      setNewProductFile(null);
       queryClient.invalidateQueries({ queryKey: ["admin-active-basket"] });
     },
     onError: (err: any) => toast.error(err.message)
+  });
+
+  const bulkImportMutation = useMutation({
+    mutationFn: async (items: {name: string; price: number; unit: string; active: boolean}[]) => {
+      if (!basket) throw new Error("Cesta não encontrada");
+      
+      const { data: prods, error: prodErr } = await supabase
+        .from("products")
+        .insert(items)
+        .select();
+
+      if (prodErr) throw prodErr;
+      if (!prods || prods.length === 0) throw new Error("Nenhum produto criado");
+
+      const basketItems = prods.map(p => ({
+        basket_id: basket.id,
+        product_id: p.id,
+        quantity: 1
+      }));
+
+      const { error: itemErr } = await supabase
+        .from("basket_items")
+        .insert(basketItems);
+
+      if (itemErr) throw itemErr;
+    },
+    onSuccess: () => {
+      toast.success("Mercadorias importadas para a cesta com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ["admin-active-basket"] });
+    },
+    onError: (err: any) => toast.error("Erro na importação: " + err.message)
   });
 
   const removeItemMutation = useMutation({
@@ -195,8 +206,8 @@ export default function AdminBasket() {
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div>
-            <h1 className="text-base font-extrabold text-white leading-tight">Gerenciar Cesta</h1>
-            <p className="text-xs text-white/75">Altere produtos, títulos e valores</p>
+            <h1 className="text-base font-extrabold text-white leading-tight">Painel de Produtos</h1>
+            <p className="text-xs text-white/75">Altere mercadorias, títulos e valores da sua loja</p>
           </div>
         </div>
       </header>
@@ -206,11 +217,11 @@ export default function AdminBasket() {
         {/* Configurações Gerais da Cesta */}
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-border">
           <h2 className="text-sm font-extrabold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
-            <Leaf className="h-4 w-4 text-primary" /> Dados da Cesta Atual
+            <Leaf className="h-4 w-4 text-primary" /> Configurações do Catálogo
           </h2>
           <div className="space-y-4">
             <div>
-              <label className="text-xs font-bold text-muted-foreground">Nome da Cesta (Ex: Cesta da Semana)</label>
+              <label className="text-xs font-bold text-muted-foreground">Título Principal (Ex: Hortifruti do João ou Produtos do Dia)</label>
               <input 
                 type="text" 
                 defaultValue={basket.name}
@@ -219,7 +230,7 @@ export default function AdminBasket() {
               />
             </div>
             <div>
-              <label className="text-xs font-bold text-muted-foreground">Preço Total (R$)</label>
+              <label className="text-xs font-bold text-muted-foreground">Taxa de Entrega Fixa ou Valor Mínimo (R$)</label>
               <input 
                 type="number" 
                 defaultValue={basket.price}
@@ -241,7 +252,7 @@ export default function AdminBasket() {
         {/* Adicionar Produto */}
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-border">
           <h2 className="text-sm font-extrabold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
-            <Plus className="h-4 w-4 text-emerald-500" /> Acrescentar Novo Produto
+            <Plus className="h-4 w-4 text-emerald-500" /> Adicionar Mercadoria
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div className="sm:col-span-2">
@@ -276,36 +287,78 @@ export default function AdminBasket() {
             </div>
           </div>
           
-          <div className="mt-4 flex flex-col gap-2">
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                className="hidden" 
-                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
-                onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                       setNewProductFile(file);
-                       toast.success(`Arquivo ${file.name} selecionado!`);
-                    }
-                }}
-              />
-              <button 
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full h-11 rounded-xl border border-dashed border-primary/50 text-primary bg-primary/5 hover:bg-primary/10 transition-colors text-sm font-bold flex items-center justify-center gap-2"
-              >
-                <Plus className="h-4 w-4" />
-                {newProductFile ? newProductFile.name : "Anexar Arquivo / Imagem"}
-              </button>
-
+          <div className="mt-4 flex flex-col gap-3">
               <button 
                 onClick={() => addProductMutation.mutate()}
                 disabled={addProductMutation.isPending}
                 className="w-full h-11 rounded-xl bg-slate-900 hover:bg-slate-800 transition-colors text-white text-sm font-bold flex items-center justify-center gap-2"
               >
-                {addProductMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                Incluir na Cesta
+                {addProductMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
+                <span>Adicionar ao Catálogo</span>
               </button>
+
+              <div className="pt-3 border-t border-border">
+                <p className="text-xs text-muted-foreground text-center mb-2">Ou adicione vários itens usando CSV ou TXT (Nome, Preço, Kg/Un)</p>
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  className="hidden" 
+                  accept=".csv,.txt"
+                  onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                         try {
+                           const text = await file.text();
+                           const lines = text.split('\n').filter(l => l.trim().length > 0);
+                           
+                           const startIndex = lines[0].toLowerCase().includes('nome') ? 1 : 0;
+                           const productsToInsert = [];
+                           
+                           for (let i = startIndex; i < lines.length; i++) {
+                               const parts = lines[i].split(',').map(s => s.trim());
+                               const name = parts[0];
+                               if (!name) continue;
+                               
+                               const price = parseFloat(parts[1]?.replace(',', '.') || "0");
+                               const unit = parts[2]?.toLowerCase() === 'kg' ? 'kg' : 'un';
+                               
+                               productsToInsert.push({ 
+                                 name, 
+                                 price: isNaN(price) ? 0 : price, 
+                                 unit, 
+                                 active: true 
+                               });
+                           }
+                           
+                           if (productsToInsert.length > 0) {
+                              toast.loading(`Importando ${productsToInsert.length} produtos...`, { id: "import-toast" });
+                              bulkImportMutation.mutate(productsToInsert, {
+                                onSuccess: () => toast.success("Sucesso!", { id: "import-toast" }),
+                                onError: () => toast.error("Erro ao importar", { id: "import-toast" })
+                              });
+                           } else {
+                              toast.error("Nenhum produto válido encontrado.");
+                           }
+                         } catch (error) {
+                           toast.error("Erro ao ler arquivo.");
+                         }
+                      }
+                      e.target.value = ''; // Reset input
+                  }}
+                />
+                <button 
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={bulkImportMutation.isPending}
+                  className="w-full h-11 rounded-xl border border-dashed border-primary/50 text-primary bg-primary/5 hover:bg-primary/10 transition-colors text-sm font-bold flex items-center justify-center gap-2"
+                >
+                  {bulkImportMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                  <span>Importar Mercadorias (Arquivo)</span>
+                </button>
+              </div>
           </div>
         </div>
 
