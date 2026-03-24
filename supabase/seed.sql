@@ -1,5 +1,5 @@
 -- ============================================================
--- HortiDelivery Lite — Script de seed inicial
+-- horti-delivery-lite — Script de seed inicial
 -- Execute no SQL Editor do Supabase
 -- ============================================================
 

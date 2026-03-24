@@ -36,7 +36,7 @@ export default function Login() {
                 <div className="text-center space-y-2">
                     <Leaf className="mx-auto h-12 w-12 text-primary mb-4" />
                     <h1 className="text-3xl font-extrabold text-foreground">Acesso Admin</h1>
-                    <p className="text-muted-foreground">HortiDelivery Lite</p>
+                    <p className="text-muted-foreground">horti-delivery-lite</p>
                 </div>
 
                 <form onSubmit={handleLogin} className="space-y-4 bg-card p-6 rounded-xl border shadow-sm">

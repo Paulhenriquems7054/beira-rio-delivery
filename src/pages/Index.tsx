@@ -89,7 +89,7 @@ export default function Index() {
         <header className="gradient-hero px-4 py-5">
           <div className="mx-auto max-w-lg flex items-center gap-2">
             <Leaf className="h-7 w-7 text-white/90" />
-            <span className="text-base font-extrabold text-white">HortiDelivery Lite</span>
+            <span className="text-base font-extrabold text-white">horti-delivery-lite</span>
           </div>
         </header>
 
@@ -140,7 +140,7 @@ export default function Index() {
           </div>
           <div>
             <h1 className="text-base font-extrabold text-white leading-tight">
-              HortiDelivery Lite
+              horti-delivery-lite
             </h1>
             <p className="text-xs text-white/75">Hortifruti fresquinho na sua porta 🌿</p>
           </div>

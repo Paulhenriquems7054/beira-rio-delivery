@@ -77,7 +77,7 @@ export default function Admin() {
             </div>
             <div>
               <h1 className="text-base font-extrabold text-white leading-tight">Painel Admin</h1>
-              <p className="text-xs text-white/75">HortiDelivery Lite · Tempo real</p>
+              <p className="text-xs text-white/75">horti-delivery-lite · Tempo real</p>
             </div>
           </div>
           {/* Indicador live e Logout */}
