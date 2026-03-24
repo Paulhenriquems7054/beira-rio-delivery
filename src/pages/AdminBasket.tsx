@@ -13,6 +13,7 @@ export default function AdminBasket() {
   const [newProductPrice, setNewProductPrice] = useState("");
   const [newProductQuantity, setNewProductQuantity] = useState("1");
   const [newProductUnit, setNewProductUnit] = useState("un");
+  const [newProductFile, setNewProductFile] = useState<File | null>(null);
   const [basketName, setBasketName] = useState("");
   const [basketPrice, setBasketPrice] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -68,7 +69,7 @@ export default function AdminBasket() {
   });
 
   const addProductMutation = useMutation({
-    mutationFn: async (file?: File) => {
+    mutationFn: async () => {
       if (!basket) throw new Error("Cesta não encontrada");
       
       const priceVal = parseFloat(newProductPrice.replace(",", "."));
@@ -79,19 +80,19 @@ export default function AdminBasket() {
       }
 
       let fileUrl = null;
-      if (file) {
+      if (newProductFile) {
         try {
-          const fileExt = file.name.split('.').pop();
+          const fileExt = newProductFile.name.split('.').pop();
           const filePath = `${Date.now()}.${fileExt}`;
-          const { data, error } = await supabase.storage.from('arquivos').upload(filePath, file);
+          const { data, error } = await supabase.storage.from('arquivos').upload(filePath, newProductFile);
           if (data) {
              const { data: publicUrlData } = supabase.storage.from('arquivos').getPublicUrl(filePath);
              fileUrl = publicUrlData.publicUrl;
           } else {
-             fileUrl = file.name; // Fallback caso bucket não exista
+             fileUrl = newProductFile.name;
           }
         } catch {
-             fileUrl = file.name; // Fallback
+             fileUrl = newProductFile.name;
         }
       }
 
@@ -123,6 +124,7 @@ export default function AdminBasket() {
       setNewProductPrice("");
       setNewProductQuantity("1");
       setNewProductUnit("un");
+      setNewProductFile(null);
       queryClient.invalidateQueries({ queryKey: ["admin-active-basket"] });
     },
     onError: (err: any) => toast.error(err.message)
@@ -273,35 +275,38 @@ export default function AdminBasket() {
               />
             </div>
           </div>
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            className="hidden" 
-            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
-            onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                   addProductMutation.mutate(file);
-                }
-                e.target.value = ''; // Reset input
-            }}
-          />
-          <button 
-            onClick={() => {
-                const priceVal = parseFloat(newProductPrice.replace(",", "."));
-                const qtyVal = parseInt(newProductQuantity, 10);
-                if (!newProductName || isNaN(priceVal) || isNaN(qtyVal)) {
-                    toast.error("Preencha todos os campos corretamente");
-                    return;
-                }
-                fileInputRef.current?.click();
-            }}
-            disabled={addProductMutation.isPending}
-            className="mt-4 w-full h-11 rounded-xl bg-slate-900 hover:bg-slate-800 transition-colors text-white text-sm font-bold flex items-center justify-center gap-2"
-          >
-            {addProductMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            Incluir na Cesta e Selecionar Arquivo
-          </button>
+          
+          <div className="mt-4 flex flex-col gap-2">
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
+                onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                       setNewProductFile(file);
+                       toast.success(`Arquivo ${file.name} selecionado!`);
+                    }
+                }}
+              />
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full h-11 rounded-xl border border-dashed border-primary/50 text-primary bg-primary/5 hover:bg-primary/10 transition-colors text-sm font-bold flex items-center justify-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                {newProductFile ? newProductFile.name : "Anexar Arquivo / Imagem"}
+              </button>
+
+              <button 
+                onClick={() => addProductMutation.mutate()}
+                disabled={addProductMutation.isPending}
+                className="w-full h-11 rounded-xl bg-slate-900 hover:bg-slate-800 transition-colors text-white text-sm font-bold flex items-center justify-center gap-2"
+              >
+                {addProductMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                Incluir na Cesta
+              </button>
+          </div>
         </div>
 
         {/* Lista de Produtos */}
