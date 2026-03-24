@@ -12,6 +12,20 @@ export default function Index() {
   const { data: basket, isLoading, isError } = useActiveBasket();
   const createOrder = useCreateOrder();
   const [step, setStep] = useState<Step>("basket");
+  const [cart, setCart] = useState<Record<string, number>>({});
+
+  const handleAdd = (id: string) => setCart(p => ({ ...p, [id]: (p[id] || 0) + 1 }));
+  const handleRemove = (id: string) => {
+    setCart(p => {
+      const next = { ...p };
+      if (next[id] > 1) next[id] -= 1;
+      else delete next[id];
+      return next;
+    });
+  };
+
+  const cartTotal = basket?.products.reduce((acc, p) => acc + (p.price * (cart[p.id] || 0)), 0) || 0;
+  const totalItems = Object.values(cart).reduce((a, b) => a + b, 0);
 
   /* ─── Loading ─── */
   if (isLoading) {
@@ -93,9 +107,9 @@ export default function Index() {
               <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                 🛒 Seu pedido
               </p>
-              <p className="text-lg font-extrabold text-foreground">{basket.name}</p>
+              <p className="text-lg font-extrabold text-foreground">Carrinho Personalizado</p>
               <p className="text-3xl font-extrabold text-primary">
-                R$ {basket.price.toFixed(2).replace(".", ",")}
+                R$ {cartTotal.toFixed(2).replace(".", ",")}
               </p>
             </div>
 
@@ -142,14 +156,14 @@ export default function Index() {
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1">
                   <p className="text-xs font-extrabold uppercase tracking-widest text-primary/70">
-                    🥗 Cesta da Semana
+                    🥗 Produtos Disponíveis
                   </p>
-                  <h2 className="text-2xl font-extrabold text-foreground mt-1">{basket.name}</h2>
+                  <h2 className="text-2xl font-extrabold text-foreground mt-1">Monte sua Cesta</h2>
                   <p className="text-4xl font-extrabold text-primary mt-2">
-                    R$ {basket.price.toFixed(2).replace(".", ",")}
+                    R$ {cartTotal.toFixed(2).replace(".", ",")}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {basket.products.length} produto{basket.products.length !== 1 ? "s" : ""} inclusos
+                    {totalItems} item(s) selecionado(s) - {basket.products.length} no catálogo
                   </p>
                 </div>
                 <div className="text-5xl mt-1">🧺</div>
@@ -159,7 +173,7 @@ export default function Index() {
             {/* Lista de produtos */}
             <div className="mt-5 space-y-2.5">
               <h3 className="text-sm font-extrabold text-muted-foreground uppercase tracking-wider px-1">
-                O que vem na cesta
+                Catálogo da Semana
               </h3>
               {basket.products.map((p, i) => (
                 <div
@@ -167,7 +181,12 @@ export default function Index() {
                   className="animate-slide-up"
                   style={{ animationDelay: `${i * 60}ms`, opacity: 0 }}
                 >
-                  <ProductCard product={p} />
+                  <ProductCard 
+                    product={p} 
+                    cartQty={cart[p.id] || 0}
+                    onAdd={() => handleAdd(p.id)}
+                    onRemove={() => handleRemove(p.id)}
+                  />
                 </div>
               ))}
             </div>
@@ -176,11 +195,12 @@ export default function Index() {
             <div className="mt-7 space-y-3">
               <button
                 id="btn-comprar-agora"
+                disabled={totalItems === 0}
                 onClick={() => setStep("checkout")}
-                className="w-full h-14 rounded-2xl gradient-hero text-white text-lg font-extrabold shadow-button flex items-center justify-center gap-2 transition-transform active:scale-[0.98]"
+                className="w-full h-14 rounded-2xl bg-primary text-white text-lg font-extrabold shadow-button flex items-center justify-center gap-2 transition-transform active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100"
               >
                 <ShoppingCart className="h-5 w-5" />
-                Comprar agora
+                Ir p/ Checkout ({totalItems})
               </button>
               <p className="text-center text-xs text-muted-foreground">
                 🔒 Sem cartão • Pagamento na entrega
@@ -194,15 +214,20 @@ export default function Index() {
           <div className="mt-6">
             <CheckoutForm
               loading={createOrder.isPending}
-              basketName={basket.name}
-              basketPrice={basket.price}
+              basketName="Carrinho Personalizado"
+              basketPrice={cartTotal}
               onBack={() => setStep("basket")}
               onSubmit={(data) => {
+                const selectedProducts = basket.products
+                  .filter(p => cart[p.id])
+                  .map(p => ({ ...p, quantity: cart[p.id] }));
+                  
                 createOrder.mutate(
-                  { ...data, total: basket.price, products: basket.products },
+                  { ...data, total: cartTotal, products: selectedProducts },
                   {
                     onSuccess: () => {
                       toast.success("Pedido enviado com sucesso! 🎉");
+                      setCart({});
                       setStep("confirmation");
                     },
                     onError: (err: any) => {
@@ -216,6 +241,16 @@ export default function Index() {
           </div>
         )}
       </main>
+
+      {/* Footer com link para Administração */}
+      <footer className="py-6 text-center border-t mt-auto">
+        <a 
+          href="/login" 
+          className="text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors flex items-center justify-center gap-1"
+        >
+          <span>🔒 Área do Produtor</span>
+        </a>
+      </footer>
     </div>
   );
 }

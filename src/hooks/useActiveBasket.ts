@@ -6,6 +6,7 @@ export interface BasketProduct {
   name: string;
   price: number;
   image_url: string | null;
+  unit: string;
   quantity: number;
 }
 
@@ -31,10 +32,10 @@ export function useActiveBasket() {
       if (bErr) throw bErr;
       if (!basket) return null;
 
-      // 2. Busca os itens com dados dos produtos via join
+      // 2. Busca os itens com dados dos produtos via join (incluindo unit)
       const { data: items, error: iErr } = await supabase
         .from("basket_items")
-        .select("quantity, products(id, name, price, image_url)")
+        .select("quantity, products(id, name, price, image_url, unit)")
         .eq("basket_id", basket.id);
 
       if (iErr) throw iErr;
@@ -44,6 +45,7 @@ export function useActiveBasket() {
         name: item.products.name,
         price: item.products.price,
         image_url: item.products.image_url,
+        unit: item.products.unit || "un",
         quantity: item.quantity,
       }));
 

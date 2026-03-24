@@ -1,0 +1,386 @@
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Leaf, Plus, Trash2, ArrowLeft, Loader2, Save } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+
+export default function AdminBasket() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  
+  const [newProductName, setNewProductName] = useState("");
+  const [newProductPrice, setNewProductPrice] = useState("");
+  const [newProductQuantity, setNewProductQuantity] = useState("1");
+  const [newProductUnit, setNewProductUnit] = useState("un");
+  const [basketName, setBasketName] = useState("");
+  const [basketPrice, setBasketPrice] = useState("");
+
+  const [editingItem, setEditingItem] = useState<any>(null);
+
+  const { data: basket, isLoading } = useQuery({
+    queryKey: ["admin-active-basket"],
+    queryFn: async () => {
+      const { data: bData, error: bErr } = await supabase
+        .from("baskets")
+        .select("*")
+        .eq("active", true)
+        .limit(1)
+        .maybeSingle();
+
+      if (bErr) throw bErr;
+      if (!bData) return null;
+
+      const { data: items, error: iErr } = await supabase
+        .from("basket_items")
+        .select("id, quantity, products(id, name, price, unit)")
+        .eq("basket_id", bData.id)
+        .order("id");
+
+      if (iErr) throw iErr;
+
+      return {
+        ...bData,
+        items: items || [],
+      };
+    },
+  });
+
+  const updateBasketMutation = useMutation({
+    mutationFn: async () => {
+      if (!basket) return;
+      const { error } = await supabase
+        .from("baskets")
+        .update({
+          name: basketName || basket.name,
+          price: parseFloat(basketPrice) || basket.price,
+        })
+        .eq("id", basket.id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Cesta atualizada com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ["admin-active-basket"] });
+    },
+    onError: (err: any) => toast.error("Erro ao atualizar a cesta: " + err.message)
+  });
+
+  const addProductMutation = useMutation({
+    mutationFn: async () => {
+      if (!basket) throw new Error("Cesta não encontrada");
+      
+      const priceVal = parseFloat(newProductPrice.replace(",", "."));
+      const qtyVal = parseInt(newProductQuantity, 10);
+      
+      if (!newProductName || isNaN(priceVal) || isNaN(qtyVal)) {
+        throw new Error("Preencha todos os campos corretamente");
+      }
+
+      // 1. Criar o produto
+      const { data: prodData, error: prodErr } = await supabase
+        .from("products")
+        .insert([{ name: newProductName, price: priceVal, unit: newProductUnit, active: true }])
+        .select()
+        .single();
+
+      if (prodErr || !prodData) throw prodErr || new Error("Erro ao criar produto");
+
+      // 2. Vincular na cesta
+      const { error: itemErr } = await supabase
+        .from("basket_items")
+        .insert([{ basket_id: basket.id, product_id: prodData.id, quantity: qtyVal }]);
+
+      if (itemErr) throw itemErr;
+    },
+    onSuccess: () => {
+      toast.success("Produto adicionado à cesta!");
+      setNewProductName("");
+      setNewProductPrice("");
+      setNewProductQuantity("1");
+      setNewProductUnit("un");
+      queryClient.invalidateQueries({ queryKey: ["admin-active-basket"] });
+    },
+    onError: (err: any) => toast.error(err.message)
+  });
+
+  const removeItemMutation = useMutation({
+    mutationFn: async (itemId: string) => {
+      const { error } = await supabase.from("basket_items").delete().eq("id", itemId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Produto removido!");
+      queryClient.invalidateQueries({ queryKey: ["admin-active-basket"] });
+    },
+    onError: (err: any) => toast.error(err.message)
+  });
+
+  const editItemMutation = useMutation({
+    mutationFn: async (data: { itemId: string; productId: string; name: string; quantity: number; price: number; unit: string }) => {
+      // 1. Atualizar produto
+      const { error: prodErr } = await supabase
+        .from("products")
+        .update({ name: data.name, price: data.price, unit: data.unit })
+        .eq("id", data.productId);
+      if (prodErr) throw prodErr;
+
+      // 2. Atualizar quantidade na cesta
+      const { error: itemErr } = await supabase
+        .from("basket_items")
+        .update({ quantity: data.quantity })
+        .eq("id", data.itemId);
+      if (itemErr) throw itemErr;
+    },
+    onSuccess: () => {
+      toast.success("Item atualizado!");
+      setEditingItem(null);
+      queryClient.invalidateQueries({ queryKey: ["admin-active-basket"] });
+    },
+    onError: (err: any) => toast.error("Erro ao salvar: " + err.message)
+  });
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center">
+        <Loader2 className="h-10 w-10 text-primary animate-spin" />
+        <p className="text-muted-foreground mt-4 font-bold">Carregando itens...</p>
+      </div>
+    );
+  }
+
+  if (!basket) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+        <h1 className="text-2xl font-bold mb-2">Ops! Sem cesta ativa.</h1>
+        <p className="text-muted-foreground mb-4">Você precisa ter uma cesta ativa no banco de dados.</p>
+        <button onClick={() => navigate("/admin")} className="text-primary font-bold flex items-center gap-2">
+          <ArrowLeft className="h-4 w-4" /> Voltar ao Painel
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-[hsl(120,12%,95%)] flex flex-col">
+      <header className="gradient-hero px-4 py-5 shadow-md sticky top-0 z-20">
+        <div className="mx-auto max-w-2xl flex items-center gap-3">
+          <button onClick={() => navigate("/admin")} className="h-10 w-10 bg-white/20 rounded-xl flex items-center justify-center text-white hover:bg-white/30 transition-colors">
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <div>
+            <h1 className="text-base font-extrabold text-white leading-tight">Gerenciar Cesta</h1>
+            <p className="text-xs text-white/75">Altere produtos, títulos e valores</p>
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-2xl w-full px-4 py-6 flex-1 space-y-6">
+        
+        {/* Configurações Gerais da Cesta */}
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-border">
+          <h2 className="text-sm font-extrabold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
+            <Leaf className="h-4 w-4 text-primary" /> Dados da Cesta Atual
+          </h2>
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-bold text-muted-foreground">Nome da Cesta (Ex: Cesta da Semana)</label>
+              <input 
+                type="text" 
+                defaultValue={basket.name}
+                onChange={(e) => setBasketName(e.target.value)}
+                className="w-full mt-1 h-11 px-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50" 
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-muted-foreground">Preço Total (R$)</label>
+              <input 
+                type="number" 
+                defaultValue={basket.price}
+                onChange={(e) => setBasketPrice(e.target.value)}
+                className="w-full mt-1 h-11 px-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50" 
+              />
+            </div>
+            <button 
+              onClick={() => updateBasketMutation.mutate()}
+              disabled={updateBasketMutation.isPending}
+              className="h-11 px-5 rounded-xl gradient-hero text-white text-sm font-bold flex items-center gap-2 justify-center shadow-button w-full sm:w-auto"
+            >
+              {updateBasketMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Salvar Alterações Globais
+            </button>
+          </div>
+        </div>
+
+        {/* Adicionar Produto */}
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-border">
+          <h2 className="text-sm font-extrabold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
+            <Plus className="h-4 w-4 text-emerald-500" /> Acrescentar Novo Produto
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <div className="sm:col-span-2">
+              <label className="text-xs font-bold text-muted-foreground">Nome (Ex: Tomate)</label>
+              <input 
+                type="text" 
+                value={newProductName}
+                onChange={(e) => setNewProductName(e.target.value)}
+                className="w-full mt-1 h-11 px-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50" 
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-muted-foreground">Medida</label>
+              <select 
+                value={newProductUnit}
+                onChange={(e) => setNewProductUnit(e.target.value)}
+                className="w-full mt-1 h-11 px-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 bg-white" 
+              >
+                <option value="un">Unidade(s)</option>
+                <option value="kg">Quilo(s)</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-muted-foreground">Preço (R$)</label>
+              <input 
+                type="text" 
+                value={newProductPrice}
+                onChange={(e) => setNewProductPrice(e.target.value)}
+                placeholder="4.50"
+                className="w-full mt-1 h-11 px-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50" 
+              />
+            </div>
+          </div>
+          <button 
+            onClick={() => addProductMutation.mutate()}
+            disabled={addProductMutation.isPending}
+            className="mt-4 w-full h-11 rounded-xl bg-slate-900 hover:bg-slate-800 transition-colors text-white text-sm font-bold flex items-center justify-center gap-2"
+          >
+            {addProductMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            Incluir na Cesta
+          </button>
+        </div>
+
+        {/* Lista de Produtos */}
+        <div>
+          <h2 className="text-sm font-extrabold uppercase tracking-wider text-muted-foreground mb-3 px-1">
+            Itens visíveis aos clientes ({basket.items.length})
+          </h2>
+          <div className="space-y-2">
+            {basket.items.length === 0 && (
+              <p className="text-center text-sm py-8 text-muted-foreground">Sua cesta está vazia.</p>
+            )}
+            {basket.items.map((item: any) => {
+              const isEditing = editingItem?.id === item.id;
+
+              return (
+                <div key={item.id} className={`bg-white p-3 rounded-xl shadow-sm border border-border transition-all ${isEditing ? 'ring-2 ring-primary/30 border-primary/50' : ''}`}>
+                  {isEditing ? (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        <div className="col-span-2 sm:col-span-3">
+                          <label className="text-xs font-bold text-muted-foreground">Nome</label>
+                          <input 
+                            type="text" 
+                            value={editingItem.name} 
+                            onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
+                            className="w-full h-9 px-3 border border-border rounded-lg text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-muted-foreground">Medida</label>
+                          <select 
+                            value={editingItem.unit} 
+                            onChange={(e) => setEditingItem({ ...editingItem, unit: e.target.value })}
+                            className="w-full h-9 px-3 border border-border rounded-lg text-sm bg-white"
+                          >
+                            <option value="un">UN</option>
+                            <option value="kg">KG</option>
+                          </select>
+                        </div>
+                        <div className="col-span-1 sm:col-span-2">
+                          <label className="text-xs font-bold text-muted-foreground">Preço (R$)</label>
+                          <input 
+                            type="number" 
+                            step="0.01"
+                            value={editingItem.price} 
+                            onChange={(e) => setEditingItem({ ...editingItem, price: parseFloat(e.target.value) || 0 })}
+                            className="w-full h-9 px-3 border border-border rounded-lg text-sm"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => setEditingItem(null)}
+                          className="flex-1 h-9 rounded-lg border border-border text-sm font-bold text-muted-foreground hover:bg-muted"
+                        >
+                          Cancelar
+                        </button>
+                        <button 
+                          onClick={() => editItemMutation.mutate({
+                            itemId: item.id,
+                            productId: item.products.id,
+                            name: editingItem.name,
+                            quantity: editingItem.quantity || 1,
+                            price: editingItem.price,
+                            unit: editingItem.unit
+                          })}
+                          disabled={editItemMutation.isPending}
+                          className="flex-1 h-9 rounded-lg bg-primary text-white text-sm font-bold flex items-center justify-center gap-1 hover:bg-primary/90"
+                        >
+                          {editItemMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between gap-3 animate-slide-up">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 bg-accent rounded-lg flex items-center justify-center text-lg">
+                          🥬
+                        </div>
+                        <div>
+                          <p className="font-extrabold text-foreground">{item.products.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Por {item.products.unit === "kg" ? "kg" : "unidade"} • R$ {item.products.price?.toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button 
+                          onClick={() => setEditingItem({ 
+                            id: item.id, 
+                            name: item.products.name, 
+                            quantity: item.quantity, 
+                            price: item.products.price,
+                            unit: item.products.unit || "un"
+                          })}
+                          className="h-9 w-9 bg-slate-50 text-slate-500 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors"
+                          title="Editar item"
+                        >
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        <button 
+                          onClick={() => {
+                            if (window.confirm(`Remover ${item.products.name} da cesta?`)) {
+                              removeItemMutation.mutate(item.id);
+                            }
+                          }}
+                          disabled={removeItemMutation.isPending}
+                          className="h-9 w-9 bg-red-50 text-red-500 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors"
+                          title="Excluir item"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+      </main>
+    </div>
+  );
+}

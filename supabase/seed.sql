@@ -14,6 +14,10 @@ VALUES
   (gen_random_uuid(), 'Alface',  3.00,  NULL, true),
   (gen_random_uuid(), 'Batata',  4.50,  NULL, true),
   (gen_random_uuid(), 'Cebola',  3.70,  NULL, true)
+  (gen_random_uuid(), 'Pimentão',  3.70,  NULL, true)
+  (gen_random_uuid(), 'Quiabo',  3.70,  NULL, true)
+  (gen_random_uuid(), 'Alho',  3.70,  NULL, true)
+  (gen_random_uuid(), 'Batatinha Inglesa',  3.70,  NULL, true)
 ON CONFLICT DO NOTHING;
 
 -- 3. Inserir a cesta da semana

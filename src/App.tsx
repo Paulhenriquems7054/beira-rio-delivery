@@ -6,6 +6,7 @@ import Index from "./pages/Index";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
+import AdminBasket from "./pages/AdminBasket";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient({
@@ -30,6 +31,14 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <Admin />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin/basket" 
+            element={
+              <ProtectedRoute>
+                <AdminBasket />
               </ProtectedRoute>
             } 
           />

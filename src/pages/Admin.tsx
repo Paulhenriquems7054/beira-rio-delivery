@@ -97,6 +97,25 @@ export default function Admin() {
       </header>
 
       <main className="mx-auto max-w-2xl px-4 py-5 pb-12">
+        {/* Botão para gerenciar a vitrine de produtos da cesta */}
+        <button
+          onClick={() => navigate("/admin/basket")}
+          className="w-full mb-6 bg-white border-2 border-primary/20 p-4 rounded-2xl flex items-center justify-between shadow-sm hover:border-primary/50 hover:bg-emerald-50/30 transition-all group"
+        >
+          <div className="flex items-center gap-4">
+            <div className="h-14 w-14 rounded-xl gradient-card shadow-card flex items-center justify-center text-3xl">
+              🛒
+            </div>
+            <div className="text-left text-sm">
+              <h2 className="font-extrabold text-foreground text-lg leading-tight">Painel de Produtos</h2>
+              <p className="text-muted-foreground mt-0.5">Adicione os itens e defina o que o cliente vê</p>
+            </div>
+          </div>
+          <div className="h-10 w-10 shrink-0 bg-primary text-white rounded-full flex items-center justify-center shadow-button group-hover:scale-105 transition-transform">
+            <span className="font-extrabold text-lg">➔</span>
+          </div>
+        </button>
+
         {/* Resumo de Vendas */}
         <div className="mb-6 grid grid-cols-2 gap-3">
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-border">
