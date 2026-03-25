@@ -45,6 +45,26 @@ export default function Login() {
         }
     };
 
+    const handleForgotPassword = async () => {
+        if (!email) {
+            toast.error("Por favor, digite seu e-mail primeiro para que possamos enviar o link de recuperação.");
+            return;
+        }
+        
+        setLoading(true);
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: window.location.origin + "/login",
+        });
+        setLoading(false);
+
+        if (error) {
+            toast.error(error.message);
+        } else {
+            toast.success("E-mail de recuperação enviado com sucesso! Verifique sua caixa de entrada.");
+        }
+    };
+
+
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
         if (slug.length < 3) return toast.error("O link da loja precisa ter pelo menos 3 caracteres");
@@ -162,9 +182,25 @@ export default function Login() {
                             <Label className="text-slate-600 font-bold">Email</Label>
                             <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="h-12 rounded-xl" />
                         </div>
-                        <div className="space-y-1.5">
+                        <div className="space-y-1.5 relative">
                             <Label className="text-slate-600 font-bold">Senha</Label>
-                            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required className="h-12 rounded-xl" />
+                            <Input 
+                                type="password" 
+                                value={password} 
+                                onChange={(e) => setPassword(e.target.value)} 
+                                required={mode === "login"}
+                                className="h-12 rounded-xl" 
+                                autoComplete={mode === "login" ? "current-password" : "new-password"} 
+                            />
+                            {mode === "login" && (
+                                <button
+                                    type="button"
+                                    onClick={handleForgotPassword}
+                                    className="text-[10px] text-emerald-600 font-bold hover:underline absolute right-0 top-0 pt-1"
+                                >
+                                    Esqueci minha senha
+                                </button>
+                            )}
                         </div>
                         
                         <Button type="submit" className="w-full h-12 rounded-xl gradient-hero mt-2 shadow-button text-base font-bold" disabled={loading}>
