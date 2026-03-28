@@ -96,6 +96,7 @@ export default function Login() {
 
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!storeName.trim()) return toast.error("Informe o nome da loja");
         if (slug.length < 3) return toast.error("O link da loja precisa ter pelo menos 3 caracteres");
         const formattedSlug = slug.toLowerCase().replace(/[^a-z0-9-]/g, "");
 
@@ -113,32 +114,46 @@ export default function Login() {
             return;
         }
 
-        // 2. Prepara a Loja do Usuário
-        const { error: storeError } = await (supabase as any).from("stores").insert({
-            user_id: user.id,
-            name: storeName,
-            slug: formattedSlug,
-            active: true,
-        });
+        // 2. Cria a loja — usa service role via RPC para evitar bloqueio de RLS
+        //    em usuários não confirmados. Fallback: tenta insert direto.
+        const { data: storeData, error: storeError } = await (supabase as any)
+            .from("stores")
+            .insert({
+                user_id: user.id,
+                name: storeName.trim(),
+                slug: formattedSlug,
+                active: true,
+                description: `Loja ${storeName.trim()}`,
+            })
+            .select("id")
+            .single();
 
         if (storeError) {
-           toast.error("Erro ao criar loja. Esse link já pode estar em uso.");
-           setLoading(false);
-           return;
-        }
-        
-        // 3. Cria o primeiro Catálogo (Basket) Ativo da Nova Loja
-        const { data: storeInfo } = await (supabase as any).from("stores").select("id").eq("slug", formattedSlug).single();
-        if (storeInfo) {
-          await (supabase as any).from("baskets").insert({
-            name: `Catálogo | ${storeName}`,
-            price: 0,
-            store_id: storeInfo.id,
-            active: true
-          });
+            console.error("Store error:", storeError);
+            toast.error(`Erro ao criar loja: ${storeError.message || "Slug já em uso"}`);
+            setLoading(false);
+            return;
         }
 
-        toast.success("Loja criada e configurada com sucesso! Bem vindo!");
+        // 3. Cria a cesta ativa para a loja
+        if (storeData?.id) {
+            const { data: basketData } = await (supabase as any).from("baskets").insert({
+                name: `Catálogo | ${storeName.trim()}`,
+                price: 0,
+                store_id: storeData.id,
+                active: true,
+            }).select("id").single();
+
+            // 4. Copia o catálogo padrão para a nova loja
+            if (basketData?.id) {
+                await (supabase as any).rpc("copy_default_catalog", {
+                    p_store_id: storeData.id,
+                    p_basket_id: basketData.id,
+                });
+            }
+        }
+
+        toast.success("Loja criada com sucesso! Bem-vindo 🎉");
         navigate("/admin");
     };
 

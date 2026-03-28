@@ -31,59 +31,24 @@ const App = () => (
       <Toaster position="top-center" richColors />
       <BrowserRouter>
         <Routes>
+          {/* ── Públicas ── */}
           <Route path="/" element={<Landing />} />
+          <Route path="/login" element={<Login />} />
           <Route path="/track" element={<OrderTracking />} />
           <Route path="/delivery" element={<Delivery />} />
+          <Route path="/delivery/:slug" element={<Delivery />} />
+
+          {/* ── Admin (protegidas) ── */}
+          <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+          <Route path="/admin/basket" element={<ProtectedRoute><AdminBasket /></ProtectedRoute>} />
+          <Route path="/admin/coupons" element={<ProtectedRoute><AdminCoupons /></ProtectedRoute>} />
+          <Route path="/admin/stores" element={<ProtectedRoute><AdminStores /></ProtectedRoute>} />
+          <Route path="/admin/delivery-zones" element={<ProtectedRoute><AdminDeliveryZones /></ProtectedRoute>} />
+          <Route path="/admin/analytics" element={<ProtectedRoute><AdminAnalytics /></ProtectedRoute>} />
+
+          {/* ── Loja do cliente — DEVE ser a última rota dinâmica ── */}
           <Route path="/:slug" element={<Index />} />
-          <Route path="/login" element={<Login />} />
-          <Route 
-            path="/admin" 
-            element={
-              <ProtectedRoute>
-                <Admin />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/admin/basket" 
-            element={
-              <ProtectedRoute>
-                <AdminBasket />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/admin/coupons" 
-            element={
-              <ProtectedRoute>
-                <AdminCoupons />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/admin/stores" 
-            element={
-              <ProtectedRoute>
-                <AdminStores />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/admin/delivery-zones" 
-            element={
-              <ProtectedRoute>
-                <AdminDeliveryZones />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/admin/analytics" 
-            element={
-              <ProtectedRoute>
-                <AdminAnalytics />
-              </ProtectedRoute>
-            } 
-          />
+
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

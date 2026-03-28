@@ -27,10 +27,11 @@ export default function AdminStores() {
     email: "",
     address: "",
     active: true,
+    delivery_pin: "1234",
   });
 
   const resetForm = () => {
-    setForm({ name: "", slug: "", description: "", logo_url: "", phone: "", email: "", address: "", active: true });
+    setForm({ name: "", slug: "", description: "", logo_url: "", phone: "", email: "", address: "", active: true, delivery_pin: "1234" });
     setEditId(null);
   };
 
@@ -50,6 +51,7 @@ export default function AdminStores() {
       email: store.email || "",
       address: store.address || "",
       active: store.active,
+      delivery_pin: store.delivery_pin || "1234",
     });
     setOpen(true);
   };
@@ -150,6 +152,18 @@ export default function AdminStores() {
                   <Switch checked={form.active} onCheckedChange={(v) => setForm((f) => ({ ...f, active: v }))} />
                   <span className="text-sm text-muted-foreground">Loja ativa</span>
                 </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-bold text-foreground">PIN do Entregador</label>
+                  <Input
+                    placeholder="4 dígitos (ex: 1234)"
+                    maxLength={4}
+                    value={form.delivery_pin}
+                    onChange={(e) => setForm((f) => ({ ...f, delivery_pin: e.target.value.replace(/\D/g, "").slice(0, 4) }))}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Link do entregador: <span className="font-mono text-primary">/delivery/{form.slug || "slug"}</span>
+                  </p>
+                </div>
                 <Button onClick={handleSave} className="w-full" disabled={createStore.isPending || updateStore.isPending}>
                   {editId ? "Salvar" : "Criar"}
                 </Button>
@@ -183,6 +197,18 @@ export default function AdminStores() {
                   <p className="text-sm text-muted-foreground">/{store.slug}</p>
                   {store.description && <p className="text-sm text-muted-foreground mt-1">{store.description}</p>}
                   {store.phone && <p className="text-xs text-muted-foreground mt-1">📞 {store.phone}</p>}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    🛵 Entregador:{" "}
+                    <a
+                      href={`/delivery/${store.slug}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary font-mono hover:underline"
+                    >
+                      /delivery/{store.slug}
+                    </a>
+                    {" "}• PIN: <span className="font-mono font-bold">{store.delivery_pin || "1234"}</span>
+                  </p>
                 </div>
                 <div className="flex gap-1">
                   <Button variant="ghost" size="icon" onClick={() => openEdit(store)}>

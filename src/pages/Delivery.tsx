@@ -1,10 +1,9 @@
 import { useState } from "react";
+import { useParams, Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { MapPin, CheckCircle2, Phone, Package, Loader2, LogOut, Bike } from "lucide-react";
+import { MapPin, CheckCircle2, Phone, Package, Loader2, LogOut, Bike, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-
-const DELIVERY_PIN = "1234"; // PIN simples — pode ser configurado via env
 
 type Order = {
   id: string;
@@ -17,19 +16,45 @@ type Order = {
   notes?: string;
 };
 
-function useDeliveryOrders() {
+type StoreInfo = {
+  id: string;
+  name: string;
+  slug: string;
+  delivery_pin: string;
+};
+
+function useStoreBySlug(slug: string) {
   return useQuery({
-    queryKey: ["delivery-orders"],
+    queryKey: ["delivery-store", slug],
     queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("stores")
+        .select("id, name, slug, delivery_pin")
+        .eq("slug", slug)
+        .eq("active", true)
+        .maybeSingle();
+      if (error) throw error;
+      return data as StoreInfo | null;
+    },
+  });
+}
+
+function useDeliveryOrders(storeId?: string) {
+  return useQuery({
+    queryKey: ["delivery-orders", storeId],
+    queryFn: async () => {
+      if (!storeId) return [];
       const { data, error } = await supabase
         .from("orders")
         .select("*")
-        .in("status", ["delivering"])
+        .eq("store_id" as any, storeId)
+        .eq("status", "delivering")
         .order("created_at", { ascending: true });
       if (error) throw error;
       return data as Order[];
     },
-    refetchInterval: 15_000, // atualiza a cada 15s
+    enabled: !!storeId,
+    refetchInterval: 15_000,
   });
 }
 
@@ -42,8 +67,6 @@ function useMarkDelivered() {
         .update({ status: "delivered" })
         .eq("id", orderId);
       if (error) throw error;
-
-      // Registra no tracking
       await (supabase as any).from("order_tracking").insert({
         order_id: orderId,
         status: "delivered",
@@ -59,26 +82,23 @@ function useMarkDelivered() {
 }
 
 // ─── PIN Screen ───────────────────────────────────────────────────────────────
-function PinScreen({ onUnlock }: { onUnlock: () => void }) {
+function PinScreen({ storeName, onUnlock }: { storeName: string; onUnlock: () => void; }) {
   const [pin, setPin] = useState("");
   const [error, setError] = useState(false);
 
+  // PIN is validated by parent via callback
   const handleDigit = (d: string) => {
     if (pin.length >= 4) return;
     const next = pin + d;
     setPin(next);
     setError(false);
-    if (next.length === 4) {
-      if (next === DELIVERY_PIN) {
-        onUnlock();
-      } else {
-        setError(true);
-        setTimeout(() => setPin(""), 600);
-      }
-    }
+    if (next.length === 4) onUnlock(next as any);
   };
 
-  const handleDelete = () => setPin(p => p.slice(0, -1));
+  const handleDelete = () => { setPin(p => p.slice(0, -1)); setError(false); };
+
+  // expose setError to parent
+  (PinScreen as any)._setError = (v: boolean) => { setError(v); if (v) setTimeout(() => setPin(""), 600); };
 
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6">
@@ -87,24 +107,18 @@ function PinScreen({ onUnlock }: { onUnlock: () => void }) {
           <Bike className="h-9 w-9 text-white" />
         </div>
         <h1 className="text-2xl font-extrabold text-white">Área do Entregador</h1>
-        <p className="text-slate-400 text-sm">Digite o PIN de acesso</p>
+        <p className="text-slate-400 text-sm text-center">{storeName}</p>
+        <p className="text-slate-500 text-xs">Digite o PIN de acesso</p>
       </div>
 
-      {/* Dots */}
       <div className="flex gap-4 mb-8">
         {[0, 1, 2, 3].map(i => (
-          <div
-            key={i}
-            className={`h-4 w-4 rounded-full transition-all duration-150 ${
-              i < pin.length
-                ? error ? "bg-red-500" : "bg-emerald-400"
-                : "bg-slate-600"
-            }`}
-          />
+          <div key={i} className={`h-4 w-4 rounded-full transition-all duration-150 ${
+            i < pin.length ? (error ? "bg-red-500" : "bg-emerald-400") : "bg-slate-600"
+          }`} />
         ))}
       </div>
 
-      {/* Keypad */}
       <div className="grid grid-cols-3 gap-3 w-full max-w-xs">
         {["1","2","3","4","5","6","7","8","9","","0","⌫"].map((d, i) => (
           <button
@@ -122,26 +136,18 @@ function PinScreen({ onUnlock }: { onUnlock: () => void }) {
         ))}
       </div>
 
-      {error && (
-        <p className="mt-6 text-red-400 font-bold text-sm animate-pulse">PIN incorreto</p>
-      )}
+      {error && <p className="mt-6 text-red-400 font-bold text-sm animate-pulse">PIN incorreto</p>}
     </div>
   );
 }
 
 // ─── Order Card ───────────────────────────────────────────────────────────────
-function OrderCard({ order, onDeliver }: { order: Order; onDeliver: (id: string) => void }) {
+function OrderCard({ order }: { order: Order }) {
   const [confirming, setConfirming] = useState(false);
   const markDelivered = useMarkDelivered();
 
-  const handleConfirm = async () => {
-    await markDelivered.mutateAsync(order.id);
-    setConfirming(false);
-  };
-
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-      {/* Header */}
       <div className="bg-amber-50 border-b border-amber-100 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Package className="h-4 w-4 text-amber-600" />
@@ -151,7 +157,6 @@ function OrderCard({ order, onDeliver }: { order: Order; onDeliver: (id: string)
       </div>
 
       <div className="p-4 space-y-3">
-        {/* Cliente */}
         <div>
           <p className="font-extrabold text-lg text-slate-800">{order.customer_name}</p>
           <p className="text-2xl font-black text-emerald-600 mt-0.5">
@@ -159,13 +164,11 @@ function OrderCard({ order, onDeliver }: { order: Order; onDeliver: (id: string)
           </p>
         </div>
 
-        {/* Endereço */}
         <div className="flex items-start gap-2 bg-slate-50 rounded-xl p-3 border border-slate-100">
           <MapPin className="h-4 w-4 text-slate-500 shrink-0 mt-0.5" />
           <p className="text-sm text-slate-700 font-medium leading-snug">{order.address}</p>
         </div>
 
-        {/* Observações */}
         {order.notes && (
           <div className="bg-yellow-50 rounded-xl p-3 border border-yellow-100">
             <p className="text-xs font-bold text-yellow-700 mb-1">Observação:</p>
@@ -173,37 +176,29 @@ function OrderCard({ order, onDeliver }: { order: Order; onDeliver: (id: string)
           </div>
         )}
 
-        {/* Ações */}
         <div className="flex gap-2 pt-1">
           <a
             href={`https://wa.me/55${order.phone.replace(/\D/g, "")}`}
-            target="_blank"
-            rel="noreferrer"
+            target="_blank" rel="noreferrer"
             className="flex-1 h-11 rounded-xl bg-green-50 border border-green-200 text-green-700 font-bold text-sm flex items-center justify-center gap-2 hover:bg-green-100 transition-colors"
           >
-            <Phone className="h-4 w-4" />
-            Ligar / WhatsApp
+            <Phone className="h-4 w-4" /> WhatsApp
           </a>
-
           <a
             href={`https://maps.google.com/?q=${encodeURIComponent(order.address)}`}
-            target="_blank"
-            rel="noreferrer"
+            target="_blank" rel="noreferrer"
             className="flex-1 h-11 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 font-bold text-sm flex items-center justify-center gap-2 hover:bg-blue-100 transition-colors"
           >
-            <MapPin className="h-4 w-4" />
-            Ver no Mapa
+            <MapPin className="h-4 w-4" /> Mapa
           </a>
         </div>
 
-        {/* Confirmar entrega */}
         {!confirming ? (
           <button
             onClick={() => setConfirming(true)}
             className="w-full h-14 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-base flex items-center justify-center gap-2 transition-colors shadow-md active:scale-[0.98]"
           >
-            <CheckCircle2 className="h-5 w-5" />
-            Confirmar Entrega
+            <CheckCircle2 className="h-5 w-5" /> Confirmar Entrega
           </button>
         ) : (
           <div className="space-y-2">
@@ -216,13 +211,11 @@ function OrderCard({ order, onDeliver }: { order: Order; onDeliver: (id: string)
                 Cancelar
               </button>
               <button
-                onClick={handleConfirm}
+                onClick={() => markDelivered.mutate(order.id)}
                 disabled={markDelivered.isPending}
                 className="flex-1 h-12 rounded-xl bg-emerald-500 text-white font-extrabold text-sm flex items-center justify-center gap-2 hover:bg-emerald-600 disabled:opacity-60"
               >
-                {markDelivered.isPending
-                  ? <Loader2 className="h-4 w-4 animate-spin" />
-                  : "✅ Sim, entregue!"}
+                {markDelivered.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "✅ Sim, entregue!"}
               </button>
             </div>
           </div>
@@ -234,14 +227,55 @@ function OrderCard({ order, onDeliver }: { order: Order; onDeliver: (id: string)
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function Delivery() {
+  const { slug } = useParams<{ slug: string }>();
   const [unlocked, setUnlocked] = useState(false);
-  const { data: orders = [], isLoading, refetch } = useDeliveryOrders();
+  const [pinError, setPinError] = useState(false);
 
-  if (!unlocked) return <PinScreen onUnlock={() => setUnlocked(true)} />;
+  const { data: store, isLoading: storeLoading } = useStoreBySlug(slug ?? "");
+  const { data: orders = [], isLoading: ordersLoading, refetch } = useDeliveryOrders(
+    unlocked ? store?.id : undefined
+  );
+
+  if (!slug) return <Navigate to="/" replace />;
+
+  if (storeLoading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 text-emerald-400 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!store) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 gap-4">
+        <Bike className="h-12 w-12 text-slate-500" />
+        <p className="text-slate-400 font-bold text-lg">Loja não encontrada</p>
+        <p className="text-slate-500 text-sm">Verifique o link com o seu gestor</p>
+      </div>
+    );
+  }
+
+  if (!unlocked) {
+    return (
+      <PinScreen
+        storeName={store.name}
+        onUnlock={(enteredPin: string) => {
+          if (enteredPin === store.delivery_pin) {
+            setUnlocked(true);
+            setPinError(false);
+          } else {
+            setPinError(true);
+            // trigger error state in PinScreen via the exposed setter
+            (PinScreen as any)._setError?.(true);
+          }
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-100">
-      {/* Header */}
       <header className="bg-slate-900 px-4 py-4 sticky top-0 z-10 shadow-md">
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -249,7 +283,7 @@ export default function Delivery() {
               <Bike className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h1 className="text-base font-extrabold text-white leading-tight">Minhas Entregas</h1>
+              <h1 className="text-base font-extrabold text-white leading-tight">{store.name}</h1>
               <p className="text-xs text-slate-400">
                 {orders.length} pedido{orders.length !== 1 ? "s" : ""} na rota
               </p>
@@ -258,9 +292,9 @@ export default function Delivery() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => refetch()}
-              className="h-9 px-3 rounded-xl bg-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-600 transition-colors"
+              className="h-9 w-9 rounded-xl bg-slate-700 flex items-center justify-center text-slate-300 hover:bg-slate-600 transition-colors"
             >
-              Atualizar
+              <RefreshCw className="h-4 w-4" />
             </button>
             <button
               onClick={() => setUnlocked(false)}
@@ -273,14 +307,14 @@ export default function Delivery() {
       </header>
 
       <main className="max-w-lg mx-auto px-4 py-5 space-y-4 pb-12">
-        {isLoading && (
+        {ordersLoading && (
           <div className="flex items-center justify-center py-16 gap-3">
             <Loader2 className="h-6 w-6 text-emerald-500 animate-spin" />
             <p className="text-slate-500 font-semibold">Carregando entregas...</p>
           </div>
         )}
 
-        {!isLoading && orders.length === 0 && (
+        {!ordersLoading && orders.length === 0 && (
           <div className="text-center py-16">
             <div className="h-20 w-20 rounded-full bg-slate-200 flex items-center justify-center mx-auto mb-4">
               <CheckCircle2 className="h-10 w-10 text-slate-400" />
@@ -291,7 +325,7 @@ export default function Delivery() {
         )}
 
         {orders.map(order => (
-          <OrderCard key={order.id} order={order} onDeliver={() => {}} />
+          <OrderCard key={order.id} order={order} />
         ))}
       </main>
     </div>

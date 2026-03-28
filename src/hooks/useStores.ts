@@ -11,6 +11,7 @@ export interface Store {
   email?: string;
   address?: string;
   active: boolean;
+  delivery_pin?: string;
   created_at: string;
 }
 

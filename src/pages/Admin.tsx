@@ -11,7 +11,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { LogOut, DollarSign } from "lucide-react";
@@ -22,7 +22,27 @@ export default function Admin() {
   const { orders, loading } = useRealtimeOrders();
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [updating, setUpdating] = useState<string | null>(null);
+  const [storeSlug, setStoreSlug] = useState<string>("default");
+  const [deliveryPin, setDeliveryPin] = useState<string>("1234");
   const navigate = useNavigate();
+
+  // Carrega o slug e PIN da loja do usuário logado
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) return;
+      (supabase as any)
+        .from("stores")
+        .select("slug, delivery_pin")
+        .eq("user_id", data.user.id)
+        .maybeSingle()
+        .then(({ data: store }: any) => {
+          if (store) {
+            setStoreSlug(store.slug);
+            setDeliveryPin(store.delivery_pin || "1234");
+          }
+        });
+    });
+  }, []);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -165,7 +185,7 @@ export default function Admin() {
           </button>
 
           <a
-            href="/delivery"
+            href={`/delivery/${storeSlug}`}
             target="_blank"
             rel="noreferrer"
             className="bg-white border-2 border-orange-200 p-4 rounded-2xl flex items-center gap-3 shadow-sm hover:border-orange-400 hover:bg-orange-50/30 transition-all sm:col-span-2"
@@ -175,7 +195,9 @@ export default function Admin() {
             </div>
             <div className="text-left flex-1 min-w-0">
               <h2 className="font-extrabold text-foreground text-base leading-tight">Tela do Entregador</h2>
-              <p className="text-muted-foreground text-xs mt-0.5">Abrir link para o motoboy • PIN: 1234</p>
+              <p className="text-muted-foreground text-xs mt-0.5">
+                /delivery/{storeSlug} • PIN: <span className="font-mono font-bold text-foreground">{deliveryPin}</span>
+              </p>
             </div>
           </a>
         </div>
