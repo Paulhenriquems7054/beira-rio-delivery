@@ -9,6 +9,9 @@ import {
   PhoneCall,
   MapPin,
   RefreshCw,
+  KeyRound,
+  Copy,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
@@ -23,8 +26,13 @@ export default function Admin() {
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [updating, setUpdating] = useState<string | null>(null);
   const [storeSlug, setStoreSlug] = useState<string>("default");
+  const [storeId, setStoreId] = useState<string>("");
   const [storeName, setStoreName] = useState<string>("");
   const [deliveryPin, setDeliveryPin] = useState<string>("1234");
+  const [editingPin, setEditingPin] = useState(false);
+  const [newPin, setNewPin] = useState("");
+  const [savingPin, setSavingPin] = useState(false);
+  const [copied, setCopied] = useState(false);
   const navigate = useNavigate();
 
   // Carrega o slug e PIN da loja do usuário logado
@@ -33,11 +41,12 @@ export default function Admin() {
       if (!data.user) return;
       (supabase as any)
         .from("stores")
-        .select("slug, name, delivery_pin")
+        .select("id, slug, name, delivery_pin")
         .eq("user_id", data.user.id)
         .maybeSingle()
         .then(({ data: store }: any) => {
           if (store) {
+            setStoreId(store.id);
             setStoreSlug(store.slug);
             setStoreName(store.name);
             setDeliveryPin(store.delivery_pin || "1234");
@@ -45,6 +54,35 @@ export default function Admin() {
         });
     });
   }, []);
+
+  const handleSavePin = async () => {
+    if (newPin.length !== 4 || !/^\d{4}$/.test(newPin)) {
+      toast.error("O PIN deve ter exatamente 4 dígitos numéricos");
+      return;
+    }
+    setSavingPin(true);
+    const { error } = await (supabase as any)
+      .from("stores")
+      .update({ delivery_pin: newPin })
+      .eq("id", storeId);
+    setSavingPin(false);
+    if (error) {
+      toast.error("Erro ao salvar PIN");
+    } else {
+      setDeliveryPin(newPin);
+      setEditingPin(false);
+      setNewPin("");
+      toast.success("PIN atualizado com sucesso!");
+    }
+  };
+
+  const handleCopyLink = () => {
+    const url = `${window.location.origin}/${storeSlug}/delivery`;
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    toast.success("Link copiado!");
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -190,22 +228,80 @@ export default function Admin() {
             </div>
           </button>
 
-          <a
-            href={`/${storeSlug}/delivery`}
-            target="_blank"
-            rel="noreferrer"
-            className="bg-white border-2 border-orange-200 p-4 rounded-2xl flex items-center gap-3 shadow-sm hover:border-orange-400 hover:bg-orange-50/30 transition-all sm:col-span-2"
-          >
-            <div className="h-12 w-12 rounded-xl bg-orange-100 shadow-card flex items-center justify-center text-2xl shrink-0">
-              🛵
+          {/* Card Entregador com PIN editável */}
+          <div className="bg-white border-2 border-orange-200 p-4 rounded-2xl shadow-sm sm:col-span-2">
+            <div className="flex items-start gap-3">
+              <div className="h-12 w-12 rounded-xl bg-orange-100 flex items-center justify-center text-2xl shrink-0">
+                🛵
+              </div>
+              <div className="flex-1 min-w-0">
+                <h2 className="font-extrabold text-foreground text-base leading-tight">Tela do Entregador</h2>
+
+                {/* Link copiável */}
+                <div className="flex items-center gap-2 mt-1.5">
+                  <a
+                    href={`/${storeSlug}/delivery`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-primary font-mono hover:underline truncate"
+                  >
+                    {window.location.origin}/{storeSlug}/delivery
+                  </a>
+                  <button
+                    onClick={handleCopyLink}
+                    className="shrink-0 h-6 w-6 rounded-md bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors"
+                    title="Copiar link"
+                  >
+                    {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5 text-slate-500" />}
+                  </button>
+                </div>
+
+                {/* PIN */}
+                {!editingPin ? (
+                  <div className="flex items-center gap-2 mt-2">
+                    <KeyRound className="h-4 w-4 text-orange-500 shrink-0" />
+                    <span className="text-sm text-muted-foreground">PIN:</span>
+                    <span className="font-mono font-extrabold text-foreground tracking-widest text-base">
+                      {deliveryPin}
+                    </span>
+                    <button
+                      onClick={() => { setEditingPin(true); setNewPin(deliveryPin); }}
+                      className="ml-1 text-xs text-primary font-bold hover:underline"
+                    >
+                      Alterar
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 mt-2">
+                    <KeyRound className="h-4 w-4 text-orange-500 shrink-0" />
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={4}
+                      placeholder="4 dígitos"
+                      value={newPin}
+                      onChange={(e) => setNewPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                      className="w-24 h-8 px-3 border border-border rounded-lg text-sm font-mono font-bold tracking-widest focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      autoFocus
+                    />
+                    <button
+                      onClick={handleSavePin}
+                      disabled={savingPin || newPin.length !== 4}
+                      className="h-8 px-3 rounded-lg bg-primary text-white text-xs font-bold disabled:opacity-50 hover:bg-primary/90"
+                    >
+                      {savingPin ? "..." : "Salvar"}
+                    </button>
+                    <button
+                      onClick={() => { setEditingPin(false); setNewPin(""); }}
+                      className="h-8 px-3 rounded-lg border border-border text-xs font-bold text-muted-foreground hover:bg-muted"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="text-left flex-1 min-w-0">
-              <h2 className="font-extrabold text-foreground text-base leading-tight">Tela do Entregador</h2>
-              <p className="text-muted-foreground text-xs mt-0.5">
-                /{storeSlug}/delivery • PIN: <span className="font-mono font-bold text-foreground">{deliveryPin}</span>
-              </p>
-            </div>
-          </a>
+          </div>
         </div>
 
         {/* Resumo de Vendas */}
