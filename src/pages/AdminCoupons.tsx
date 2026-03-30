@@ -184,12 +184,12 @@ export default function AdminCoupons() {
                   value={form.expires_at}
                   onChange={(e) => setForm((f) => ({ ...f, expires_at: e.target.value }))}
                 />
-                <Select value={form.store_id} onValueChange={(v) => setForm((f) => ({ ...f, store_id: v }))}>
+                <Select value={form.store_id || "all"} onValueChange={(v) => setForm((f) => ({ ...f, store_id: v === "all" ? "" : v }))}>
                   <SelectTrigger>
                     <SelectValue placeholder="Loja (opcional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todas as lojas</SelectItem>
+                    <SelectItem value="all">Todas as lojas</SelectItem>
                     {stores?.map((s) => (
                       <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                     ))}
