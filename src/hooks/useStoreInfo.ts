@@ -1,10 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/services/supabase";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface StoreInfo {
   id: string;
   name: string;
   slug: string;
+  description?: string;
+  logo_url?: string;
+  phone?: string;
+  active: boolean;
+  subscription_status: string;
+  blocked_reason?: string;
 }
 
 export function useStoreInfo(slug: string | undefined) {
@@ -12,13 +18,13 @@ export function useStoreInfo(slug: string | undefined) {
     queryKey: ["store-info", slug],
     queryFn: async () => {
       if (!slug) throw new Error("Slug não fornecido");
-      
+
       const { data, error } = await (supabase as any)
         .from("stores")
-        .select("*")
+        .select("id, name, slug, description, logo_url, phone, active, subscription_status, blocked_reason")
         .eq("slug", slug)
         .maybeSingle();
-      
+
       if (error) throw error;
       return data as StoreInfo | null;
     },

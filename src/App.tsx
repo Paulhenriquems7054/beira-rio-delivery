@@ -16,6 +16,7 @@ import OrderTracking from "./pages/OrderTracking";
 import Delivery from "./pages/Delivery";
 import AdminDirectDelivery from "./pages/AdminDirectDelivery";
 import DirectDeliveryTracking from "./pages/DirectDeliveryTracking";
+import SuperAdmin from "./pages/SuperAdmin";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient({
@@ -38,6 +39,7 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/track" element={<OrderTracking />} />
           <Route path="/delivery-tracking" element={<DirectDeliveryTracking />} />
+          <Route path="/superadmin" element={<SuperAdmin />} />
           <Route path="/delivery" element={<Delivery />} />
           <Route path="/delivery/:slug" element={<Delivery />} />
 
