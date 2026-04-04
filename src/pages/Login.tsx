@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { logAuditEvent } from "@/hooks/useAuditLog";
+import { Leaf, Eye, EyeOff, Store, LinkIcon } from "lucide-react";
 
 export default function Login() {
     const [mode, setMode] = useState<"login" | "register">("login");
