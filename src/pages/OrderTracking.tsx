@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, Package, MapPin, Clock, CheckCircle2, ChefHat, Bike, Loader2 } from "lucide-react";
+import { Search, Package, MapPin, Clock, CheckCircle2, ChefHat, Bike, Loader2, Leaf } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import HCaptcha from "@hcaptcha/react-hcaptcha";
+import { useParams, useNavigate } from "react-router-dom";
+import { useStoreInfo } from "@/hooks/useStoreInfo";
 
 type Order = {
   id: string;
@@ -116,18 +117,20 @@ function useRealtimeCustomerOrders(phone: string) {
 }
 
 export default function OrderTracking() {
+  const { slug } = useParams();
+  const navigate = useNavigate();
+  const { data: store } = useStoreInfo(slug);
+  
   const [phone, setPhone] = useState("");
   const [searchPhone, setSearchPhone] = useState("");
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  const captchaRef = useRef<HCaptcha>(null);
   const { orders, loading } = useRealtimeCustomerOrders(searchPhone);
-
-  const HCAPTCHA_SITE_KEY = (import.meta as any).env?.VITE_HCAPTCHA_SITE_KEY ?? "10000000-ffff-ffff-ffff-000000000001";
 
   const handleSearch = () => {
     const clean = phone.replace(/\D/g, "");
-    if (clean.length < 10) { toast.error("Digite um telefone válido"); return; }
-    if (!captchaToken) { toast.error("Complete a verificação de segurança"); return; }
+    if (clean.length < 10) { 
+      toast.error("Digite um telefone válido"); 
+      return; 
+    }
     setSearchPhone(clean);
   };
 
@@ -135,8 +138,27 @@ export default function OrderTracking() {
     <div className="min-h-screen bg-background">
       <header className="gradient-hero px-4 py-5 shadow-md">
         <div className="mx-auto max-w-2xl">
-          <h1 className="text-xl font-extrabold text-white">Rastrear Pedido</h1>
-          <p className="text-sm text-white/75 mt-1">Acompanhe sua entrega em tempo real</p>
+          <div className="flex items-center gap-3 mb-2">
+            {store && (
+              <>
+                <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center">
+                  <Leaf className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-base font-extrabold text-white leading-tight">
+                    {store.name}
+                  </h1>
+                  <p className="text-xs text-white/75">Rastreamento de Pedidos</p>
+                </div>
+              </>
+            )}
+            {!store && (
+              <>
+                <h1 className="text-xl font-extrabold text-white">Rastrear Pedido</h1>
+              </>
+            )}
+          </div>
+          <p className="text-sm text-white/90 mt-1">Acompanhe sua entrega em tempo real 📦</p>
         </div>
       </header>
 
@@ -155,15 +177,6 @@ export default function OrderTracking() {
             <Button onClick={handleSearch} disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
             </Button>
-          </div>
-          <div className="mt-3 flex justify-center">
-            <HCaptcha
-              ref={captchaRef}
-              sitekey={HCAPTCHA_SITE_KEY}
-              onVerify={(token) => setCaptchaToken(token)}
-              onExpire={() => setCaptchaToken(null)}
-              size="normal"
-            />
           </div>
         </div>
 
@@ -187,12 +200,21 @@ export default function OrderTracking() {
         {/* Lista de pedidos */}
         {orders.length > 0 && (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground font-semibold">
-              {orders.length} pedido(s) • atualização automática ativo 🟢
-            </p>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground font-semibold">
+                {orders.length} pedido(s) encontrado(s)
+              </p>
+              <div className="flex items-center gap-1.5 text-xs text-emerald-600 font-semibold">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                Atualização automática
+              </div>
+            </div>
 
             {orders.map((order) => (
-              <div key={order.id} className="bg-white rounded-2xl p-5 shadow-sm border">
+              <div key={order.id} className="bg-white rounded-2xl p-5 shadow-sm border animate-slide-up">
                 {/* Header */}
                 <div className="flex items-start justify-between mb-3">
                   <div>
@@ -228,6 +250,16 @@ export default function OrderTracking() {
                 )}
               </div>
             ))}
+            
+            {/* Botão voltar à loja */}
+            {slug && (
+              <button
+                onClick={() => navigate(`/${slug}`)}
+                className="w-full h-12 rounded-2xl border-2 border-primary text-primary font-bold hover:bg-accent transition-colors"
+              >
+                ← Voltar à Loja
+              </button>
+            )}
           </div>
         )}
       </main>

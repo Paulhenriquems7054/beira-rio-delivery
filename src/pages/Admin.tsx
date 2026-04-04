@@ -158,6 +158,19 @@ export default function Admin() {
         {/* Menu de Gestão */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
           <button
+            onClick={() => navigate("/track")}
+            className="bg-white border-2 border-emerald-200 p-4 rounded-2xl flex items-center gap-3 shadow-sm hover:border-emerald-400 hover:bg-emerald-50/30 transition-all group"
+          >
+            <div className="h-12 w-12 rounded-xl bg-emerald-100 shadow-card flex items-center justify-center text-2xl shrink-0">
+              📦
+            </div>
+            <div className="text-left flex-1 min-w-0">
+              <h2 className="font-extrabold text-foreground text-base leading-tight">Rastrear Pedido</h2>
+              <p className="text-muted-foreground text-xs mt-0.5">Buscar por código</p>
+            </div>
+          </button>
+
+          <button
             onClick={() => navigate("/admin/basket")}
             className="bg-white border-2 border-primary/20 p-4 rounded-2xl flex items-center gap-3 shadow-sm hover:border-primary/50 hover:bg-emerald-50/30 transition-all group"
           >

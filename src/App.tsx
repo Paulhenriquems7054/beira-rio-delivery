@@ -13,6 +13,7 @@ import AdminStores from "./pages/AdminStores";
 import AdminDeliveryZones from "./pages/AdminDeliveryZones";
 import AdminAnalytics from "./pages/AdminAnalytics";
 import OrderTracking from "./pages/OrderTracking";
+import CustomerTracking from "./pages/CustomerTracking";
 import Delivery from "./pages/Delivery";
 import AdminDirectDelivery from "./pages/AdminDirectDelivery";
 import DirectDeliveryTracking from "./pages/DirectDeliveryTracking";
@@ -54,6 +55,12 @@ const App = () => (
 
           {/* ── Entregador por loja ── */}
           <Route path="/:slug/delivery" element={<Delivery />} />
+          
+          {/* ── Rastreamento do cliente (página pública) ── */}
+          <Route path="/:slug/pedido/:orderId" element={<CustomerTracking />} />
+          
+          {/* ── Rastreamento admin (busca por telefone) ── */}
+          <Route path="/:slug/rastrear" element={<OrderTracking />} />
 
           {/* ── Loja do cliente — última rota dinâmica ── */}
           <Route path="/:slug" element={<Index />} />

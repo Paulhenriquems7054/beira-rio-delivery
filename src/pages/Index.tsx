@@ -8,7 +8,7 @@ import { CategoryFilter } from "@/components/CategoryFilter";
 import { WeightPickerModal } from "@/components/WeightPickerModal";
 import { ShoppingCart, CheckCircle2, Leaf, Package, Store } from "lucide-react";
 import { toast } from "sonner";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useStoreInfo } from "@/hooks/useStoreInfo";
 import type { BasketProduct } from "@/hooks/useActiveBasket";
 
@@ -16,6 +16,7 @@ type Step = "basket" | "checkout" | "confirmation";
 
 export default function Index() {
   const { slug } = useParams();
+  const navigate = useNavigate();
   const { data: store, isLoading: isStoreLoading, isError: isStoreError } = useStoreInfo(slug);
   
   // Agora os hooks carregam usando o store.id dessa loja!
@@ -25,8 +26,12 @@ export default function Index() {
   const [step, setStep] = useState<Step>("basket");
   const [cart, setCart] = useState<Record<string, number>>({});        // unit: qty
   const [weightCart, setWeightCart] = useState<Record<string, number>>({}); // weight: kg
+  const [productMode, setProductMode] = useState<Record<string, 'unit' | 'weight'>>({}); // modo selecionado para produtos 'both'
   const [weightModalProduct, setWeightModalProduct] = useState<BasketProduct | null>(null);
   const [confirmedTotal, setConfirmedTotal] = useState(0);
+  const [confirmedItems, setConfirmedItems] = useState<any[]>([]); // itens do pedido confirmado
+  const [confirmedOrderId, setConfirmedOrderId] = useState<string>(""); // ID do pedido confirmado
+  const [confirmedPhone, setConfirmedPhone] = useState<string>(""); // telefone do pedido confirmado
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
@@ -46,21 +51,52 @@ export default function Index() {
       setWeightCart(p => ({ ...p, [productId]: weight }));
     }
   };
+  
+  const handleToggleMode = (productId: string) => {
+    setProductMode(prev => ({
+      ...prev,
+      [productId]: prev[productId] === 'weight' ? 'unit' : 'weight'
+    }));
+    // Limpa o carrinho desse produto ao trocar de modo
+    setCart(p => { const n = { ...p }; delete n[productId]; return n; });
+    setWeightCart(p => { const n = { ...p }; delete n[productId]; return n; });
+  };
 
-  // Calcula total considerando peso e unidade
+  // Calcula total APENAS de itens por peso (itens por unidade não têm preço definido)
   const cartTotal = useMemo(() => {
     if (!basket?.products) return 0;
     return basket.products.reduce((acc, p) => {
-      if (p.sell_by === "weight") {
+      const sellBy = p.sell_by || 'unit';
+      const mode = sellBy === 'both' ? (productMode[p.id] || 'unit') : sellBy;
+      
+      // Apenas itens por PESO têm valor calculado
+      if (mode === 'weight') {
         const kg = weightCart[p.id] || 0;
         return acc + kg * (p.price_per_kg ?? p.price);
       }
-      return acc + p.price * (cart[p.id] || 0);
+      
+      // Itens por UNIDADE não entram no total (serão pesados depois)
+      return acc;
     }, 0);
-  }, [basket?.products, cart, weightCart]);
+  }, [basket?.products, cart, weightCart, productMode]);
 
-  const totalItems = Object.values(cart).reduce((a, b) => a + b, 0)
-    + Object.keys(weightCart).length;
+  // Contar itens por peso e por unidade separadamente
+  const itemsByWeight = Object.keys(weightCart).length;
+  const itemsByUnit = Object.values(cart).reduce((a, b) => a + b, 0);
+  const totalItems = itemsByWeight + itemsByUnit;
+  
+  // Itens que precisam ser pesados (comprados por unidade)
+  const itemsNeedingWeighing = useMemo(() => {
+    if (!basket?.products) return [];
+    return basket.products.filter(p => {
+      const sellBy = p.sell_by || 'unit';
+      const mode = sellBy === 'both' ? (productMode[p.id] || 'unit') : sellBy;
+      return mode === 'unit' && (cart[p.id] || 0) > 0;
+    }).map(p => ({
+      ...p,
+      quantity: cart[p.id]
+    }));
+  }, [basket?.products, cart, productMode]);
 
   // Filter products based on search and category
   const filteredProducts = useMemo(() => {
@@ -175,12 +211,12 @@ export default function Index() {
         <header className="gradient-hero px-4 py-5">
           <div className="mx-auto max-w-lg flex items-center gap-2">
             <Leaf className="h-7 w-7 text-white/90" />
-            <span className="text-base font-extrabold text-white">horti-delivery-lite</span>
+            <span className="text-base font-extrabold text-white">{store.name}</span>
           </div>
         </header>
 
         <main className="flex flex-1 items-center justify-center px-4 py-8">
-          <div className="text-center max-w-sm animate-pop-in">
+          <div className="text-center max-w-md animate-pop-in w-full">
             <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-emerald-100">
               <CheckCircle2 className="h-14 w-14 text-emerald-500" />
             </div>
@@ -189,25 +225,86 @@ export default function Index() {
               Vamos preparar sua cesta com carinho 🥬✨
             </p>
 
-            <div className="mt-6 rounded-2xl gradient-card border border-primary/20 p-5 text-left space-y-1">
+            {/* Card do pedido com detalhes */}
+            <div className="mt-6 rounded-2xl gradient-card border border-primary/20 p-5 text-left space-y-3">
               <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                 🛒 Seu pedido
               </p>
               <p className="text-lg font-extrabold text-foreground">Carrinho Personalizado</p>
-              <p className="text-3xl font-extrabold text-primary">
-                R$ {confirmedTotal.toFixed(2).replace(".", ",")}
-              </p>
+              
+              {/* Lista de itens confirmados */}
+              {confirmedItems.length > 0 && (
+                <div className="mt-3 space-y-2 max-h-48 overflow-y-auto border-t border-primary/10 pt-3">
+                  {confirmedItems.map((item, idx) => (
+                    <div key={idx} className="flex justify-between items-start text-sm">
+                      <div className="flex-1">
+                        <p className="font-semibold text-foreground">{item.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.sold_by === 'weight' ? (
+                            <>
+                              {item.weight_kg < 1 
+                                ? `${Math.round(item.weight_kg * 1000)}g` 
+                                : `${item.weight_kg.toFixed(2)}kg`}
+                              {' '}× R$ {(item.price_per_kg ?? item.price).toFixed(2).replace(".", ",")}
+                            </>
+                          ) : (
+                            <>
+                              {item.quantity} unidade{item.quantity > 1 ? 's' : ''} (a pesar)
+                            </>
+                          )}
+                        </p>
+                      </div>
+                      <p className="font-bold text-primary ml-2">
+                        {item.sold_by === 'weight' ? (
+                          `R$ ${item.price.toFixed(2).replace(".", ",")}`
+                        ) : (
+                          <span className="text-amber-600 text-xs">A pesar</span>
+                        )}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {/* Total */}
+              <div className="border-t border-primary/10 pt-3 mt-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-semibold text-muted-foreground">Total (itens por peso):</span>
+                  <span className="text-3xl font-extrabold text-primary">
+                    R$ {confirmedTotal.toFixed(2).replace(".", ",")}
+                  </span>
+                </div>
+                {confirmedItems.some(item => item.sold_by === 'unit') && (
+                  <p className="text-xs text-amber-600 mt-2">
+                    ⚖️ Itens por unidade serão pesados e o valor será atualizado
+                  </p>
+                )}
+              </div>
             </div>
 
-            <p className="text-sm text-muted-foreground mt-4">
-              Acompanhe o status com o atendente do mercado 📞
+            {/* Botão de acompanhamento em tempo real */}
+            <button
+              onClick={() => navigate(`/${slug}/pedido/${confirmedOrderId}?phone=${confirmedPhone}`)}
+              className="mt-6 w-full h-13 py-3.5 rounded-2xl gradient-hero text-white font-extrabold text-base shadow-button flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
+            >
+              <Package className="h-5 w-5" />
+              Acompanhar Pedido em Tempo Real
+            </button>
+
+            <p className="text-xs text-center text-muted-foreground mt-3 px-4">
+              Atualizações automáticas do status da sua entrega
             </p>
 
             <button
-              onClick={() => setStep("basket")}
-              className="mt-6 w-full h-13 py-3.5 rounded-2xl border-2 border-primary text-primary font-extrabold text-base hover:bg-accent transition-colors"
+              onClick={() => {
+                setStep("basket");
+                setConfirmedItems([]);
+                setConfirmedOrderId("");
+                setConfirmedPhone("");
+              }}
+              className="mt-4 w-full h-13 py-3.5 rounded-2xl border-2 border-primary text-primary font-extrabold text-base hover:bg-accent transition-colors"
             >
-              ← Voltar ao início
+              ← Fazer Novo Pedido
             </button>
           </div>
         </main>
@@ -226,9 +323,9 @@ export default function Index() {
           </div>
           <div>
             <h1 className="text-base font-extrabold text-white leading-tight">
-              horti-delivery-lite
+              {store.name}
             </h1>
-            <p className="text-xs text-white/75">Hortifruti fresquinho na sua porta 🌿</p>
+            <p className="text-xs text-white/75">{store.description || "Hortifruti fresquinho na sua porta 🌿"}</p>
           </div>
         </div>
       </header>
@@ -245,15 +342,81 @@ export default function Index() {
                     🥗 Produtos Disponíveis
                   </p>
                   <h2 className="text-2xl font-extrabold text-foreground mt-1">Monte sua Cesta</h2>
-                  <p className="text-4xl font-extrabold text-primary mt-2">
-                    R$ {cartTotal.toFixed(2).replace(".", ",")}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {totalItems} item(s) selecionado(s) - {basket.products.length} no catálogo
-                  </p>
+                  
+                  {/* Valor calculado (apenas itens por peso) */}
+                  {cartTotal > 0 ? (
+                    <p className="text-4xl font-extrabold text-primary mt-2">
+                      R$ {cartTotal.toFixed(2).replace(".", ",")}
+                    </p>
+                  ) : (
+                    <p className="text-4xl font-extrabold text-slate-400 mt-2">
+                      R$ 0,00
+                    </p>
+                  )}
+                  
+                  {/* Informações dos itens */}
+                  <div className="mt-2 space-y-0.5">
+                    <p className="text-xs text-muted-foreground">
+                      {totalItems} item(s) selecionado(s) - {basket.products.length} no catálogo
+                    </p>
+                    
+                    {/* Itens por peso (com valor) */}
+                    {itemsByWeight > 0 && (
+                      <p className="text-xs text-emerald-600 font-semibold">
+                        ✓ {itemsByWeight} por peso: R$ {cartTotal.toFixed(2).replace(".", ",")}
+                      </p>
+                    )}
+                    
+                    {/* Itens por unidade (aguardando pesagem) */}
+                    {itemsByUnit > 0 && (
+                      <p className="text-xs text-amber-600 font-semibold">
+                        ⚖️ {itemsByUnit} por unidade: A pesar
+                      </p>
+                    )}
+                  </div>
                 </div>
                 <div className="text-5xl mt-1">🧺</div>
               </div>
+              
+              {/* Prévia dos itens selecionados */}
+              {totalItems > 0 && (
+                <div className="mt-4 pt-4 border-t border-primary/10">
+                  <p className="text-xs font-bold text-muted-foreground mb-2">Prévia do Carrinho:</p>
+                  <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                    {/* Itens por peso */}
+                    {basket.products.filter(p => {
+                      const sellBy = p.sell_by || 'unit';
+                      const mode = sellBy === 'both' ? (productMode[p.id] || 'unit') : sellBy;
+                      return mode === 'weight' && (weightCart[p.id] || 0) > 0;
+                    }).map(p => (
+                      <div key={p.id} className="flex justify-between text-xs">
+                        <span className="text-foreground">
+                          {p.name} ({weightCart[p.id] < 1 ? `${Math.round(weightCart[p.id] * 1000)}g` : `${weightCart[p.id]}kg`})
+                        </span>
+                        <span className="font-bold text-emerald-600">
+                          R$ {(weightCart[p.id] * (p.price_per_kg ?? p.price)).toFixed(2).replace(".", ",")}
+                        </span>
+                      </div>
+                    ))}
+                    
+                    {/* Itens por unidade */}
+                    {basket.products.filter(p => {
+                      const sellBy = p.sell_by || 'unit';
+                      const mode = sellBy === 'both' ? (productMode[p.id] || 'unit') : sellBy;
+                      return mode === 'unit' && (cart[p.id] || 0) > 0;
+                    }).map(p => (
+                      <div key={p.id} className="flex justify-between text-xs">
+                        <span className="text-foreground">
+                          {p.name} ({cart[p.id]} un)
+                        </span>
+                        <span className="font-bold text-amber-600">
+                          A pesar
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Lista de produtos */}
@@ -288,6 +451,8 @@ export default function Index() {
                     onAdd={() => handleAdd(p.id)}
                     onRemove={() => handleRemove(p.id)}
                     onSelectWeight={() => setWeightModalProduct(p)}
+                    selectedMode={productMode[p.id]}
+                    onToggleMode={() => handleToggleMode(p.id)}
                   />
                 </div>
               ))}
@@ -322,11 +487,33 @@ export default function Index() {
               onBack={() => setStep("basket")}
               onSubmit={(data) => {
                 const selectedProducts = basket.products
-                  .filter(p => p.sell_by === "weight" ? (weightCart[p.id] || 0) > 0 : (cart[p.id] || 0) > 0)
-                  .map(p => p.sell_by === "weight"
-                    ? { ...p, quantity: 1, weight_kg: weightCart[p.id], price: (p.price_per_kg ?? p.price) * weightCart[p.id] }
-                    : { ...p, quantity: cart[p.id] }
-                  );
+                  .filter(p => {
+                    const sellBy = p.sell_by || 'unit';
+                    const mode = sellBy === 'both' ? (productMode[p.id] || 'unit') : sellBy;
+                    return mode === 'weight' ? (weightCart[p.id] || 0) > 0 : (cart[p.id] || 0) > 0;
+                  })
+                  .map(p => {
+                    const sellBy = p.sell_by || 'unit';
+                    const mode = sellBy === 'both' ? (productMode[p.id] || 'unit') : sellBy;
+                    
+                    if (mode === 'weight') {
+                      return { 
+                        ...p, 
+                        quantity: 1, 
+                        weight_kg: weightCart[p.id], 
+                        price: (p.price_per_kg ?? p.price) * weightCart[p.id],
+                        sold_by: 'weight'
+                      };
+                    } else {
+                      const pricePerUnit = (p as any).price_per_unit ?? p.price;
+                      return { 
+                        ...p, 
+                        quantity: cart[p.id],
+                        price: pricePerUnit,
+                        sold_by: 'unit'
+                      };
+                    }
+                  });
 
                 createOrder.mutate(
                   {
@@ -340,11 +527,15 @@ export default function Index() {
                     discount: data.discount,
                   },
                   {
-                    onSuccess: () => {
+                    onSuccess: (order) => {
                       toast.success("Pedido enviado com sucesso! 🎉");
                       setConfirmedTotal(data.total_with_fee || cartTotal);
+                      setConfirmedItems(selectedProducts); // Salvar itens confirmados
+                      setConfirmedOrderId(order.id); // Salvar ID do pedido
+                      setConfirmedPhone(data.phone); // Salvar telefone
                       setCart({});
                       setWeightCart({});
+                      setProductMode({});
                       setStep("confirmation");
                     },
                     onError: (err: any) => {

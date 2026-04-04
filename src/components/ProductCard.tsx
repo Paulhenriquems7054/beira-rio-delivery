@@ -25,12 +25,28 @@ interface Props {
   onAdd?: () => void;       // unit mode
   onRemove?: () => void;    // unit mode
   onSelectWeight?: () => void; // weight mode — abre modal
+  selectedMode?: 'unit' | 'weight'; // modo selecionado quando sell_by = 'both'
+  onToggleMode?: () => void; // alterna entre unit e weight
 }
 
-export function ProductCard({ product, cartQty = 0, cartWeight, onAdd, onRemove, onSelectWeight }: Props) {
+export function ProductCard({ 
+  product, 
+  cartQty = 0, 
+  cartWeight, 
+  onAdd, 
+  onRemove, 
+  onSelectWeight,
+  selectedMode,
+  onToggleMode 
+}: Props) {
   const emoji = getEmoji(product.name);
-  const isWeight = product.sell_by === "weight";
+  const sellBy = (product.sell_by || 'unit') as 'unit' | 'weight' | 'both';
+  const isBoth = sellBy === 'both';
+  const currentMode: 'unit' | 'weight' = isBoth ? (selectedMode || 'unit') : (sellBy === 'weight' ? 'weight' : 'unit');
+  const isWeight = currentMode === 'weight';
+  
   const pricePerKg = product.price_per_kg ?? product.price;
+  const pricePerUnit = (product as any).price_per_unit ?? product.price;
   const inCart = isWeight ? (cartWeight ?? 0) > 0 : cartQty > 0;
 
   return (
@@ -47,23 +63,44 @@ export function ProductCard({ product, cartQty = 0, cartWeight, onAdd, onRemove,
       {/* Infos */}
       <div className="flex-1 min-w-0">
         <p className="font-bold text-foreground truncate">{product.name}</p>
-        {isWeight ? (
-          <div>
-            <p className="text-sm mt-0.5">
-              <span className="text-primary font-bold">R$ {pricePerKg.toFixed(2).replace(".", ",")}</span>
-              <span className="text-xs text-muted-foreground ml-1">/ kg</span>
-            </p>
-            {inCart && cartWeight && (
-              <p className="text-xs text-emerald-600 font-semibold mt-0.5">
-                {cartWeight < 1 ? `${Math.round(cartWeight * 1000)}g` : `${cartWeight.toFixed(2)}kg`}
-                {" "}≈ R$ {(cartWeight * pricePerKg).toFixed(2).replace(".", ",")}
-              </p>
-            )}
+        
+        {/* Preço por kg - SEMPRE visível */}
+        <p className="text-sm mt-0.5">
+          <span className="text-primary font-bold">R$ {pricePerKg.toFixed(2).replace(".", ",")}</span>
+          <span className="text-xs text-muted-foreground ml-1">/ kg</span>
+        </p>
+        
+        {/* Toggle de modo (quando sell_by = 'both') */}
+        {isBoth && onToggleMode && (
+          <div className="flex gap-1 mt-1">
+            <button
+              onClick={onToggleMode}
+              className={`text-[10px] px-2 py-0.5 rounded-full font-bold transition-colors ${
+                currentMode === 'unit' 
+                  ? 'bg-primary text-white' 
+                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+              }`}
+            >
+              Por Unidade
+            </button>
+            <button
+              onClick={onToggleMode}
+              className={`text-[10px] px-2 py-0.5 rounded-full font-bold transition-colors ${
+                currentMode === 'weight' 
+                  ? 'bg-primary text-white' 
+                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+              }`}
+            >
+              Por Peso
+            </button>
           </div>
-        ) : (
-          <p className="text-sm text-muted-foreground mt-0.5">
-            <span className="text-primary font-bold">R$ {product.price.toFixed(2).replace(".", ",")}</span>
-            <span className="text-xs text-muted-foreground ml-1">/ {product.unit === "kg" ? "kg" : "un"}</span>
+        )}
+        
+        {/* Informação do carrinho (apenas quando em modo peso e tem item) */}
+        {isWeight && inCart && cartWeight && (
+          <p className="text-xs text-emerald-600 font-semibold mt-0.5">
+            {cartWeight < 1 ? `${Math.round(cartWeight * 1000)}g` : `${cartWeight.toFixed(2)}kg`}
+            {" "}≈ R$ {(cartWeight * pricePerKg).toFixed(2).replace(".", ",")}
           </p>
         )}
       </div>
