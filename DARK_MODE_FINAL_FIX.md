@@ -55,6 +55,33 @@ className="... bg-card text-foreground ..."
 </div>
 ```
 
+### 3. Admin.tsx - Kanban Columns
+
+#### Colunas do Kanban:
+- ✅ **Novos Pedidos**: `bg-slate-100` → `bg-slate-100 dark:bg-slate-800`
+- ✅ **Separando**: `bg-blue-50` → `bg-blue-50 dark:bg-blue-950/30`
+- ✅ **Na Rota**: `bg-amber-50` → `bg-amber-50 dark:bg-amber-950/30`
+- ✅ **Concluído**: `bg-emerald-50` → `bg-emerald-50 dark:bg-emerald-950/30`
+
+#### Cabeçalhos das Colunas:
+- ✅ Título: `text-slate-800` → `text-foreground`
+- ✅ Badge de contagem: `bg-white/60 text-slate-600` → `bg-white/60 dark:bg-black/40 text-slate-600 dark:text-slate-300`
+- ✅ Borda: `border-black/5` → `border-black/5 dark:border-white/5`
+- ✅ Fundo: `bg-black/5` → `bg-black/5 dark:bg-white/5`
+
+#### Texto "Vazio":
+- ✅ `text-slate-400` → `text-muted-foreground`
+
+**Antes:**
+```tsx
+{ id: "pending", title: "Novos Pedidos", icon: "🔔", bg: "bg-slate-100", border: "border-slate-200" }
+```
+
+**Depois:**
+```tsx
+{ id: "pending", title: "Novos Pedidos", icon: "🔔", bg: "bg-slate-100 dark:bg-slate-800", border: "border-slate-200 dark:border-slate-700" }
+```
+
 ## Classes CSS Adaptativas Usadas
 
 ### Backgrounds
@@ -161,6 +188,12 @@ className="... bg-card text-foreground ..."
    - Cards de zonas corrigidos
    - Preview de imagem corrigido
    - Textos adaptados
+
+3. ✅ `src/pages/Admin.tsx`
+   - 4 colunas do Kanban corrigidas
+   - Cabeçalhos adaptados ao dark mode
+   - Badges de contagem com variantes dark
+   - Texto "Vazio" adaptado
 
 ## Status
 
