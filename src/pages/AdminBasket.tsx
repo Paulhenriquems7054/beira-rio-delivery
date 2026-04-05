@@ -656,7 +656,7 @@ export default function AdminBasket() {
                             unit: item.products.unit || "un",
                             image_url: item.products.image_url
                           })}
-                          className="h-9 w-9 bg-muted text-foreground rounded-lg flex items-center justify-center hover:bg-muted/80 transition-colors"
+                          className="h-9 w-9 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 rounded-lg flex items-center justify-center hover:bg-blue-100 dark:hover:bg-blue-950/50 transition-colors border border-blue-200 dark:border-blue-800"
                           title="Editar item"
                         >
                           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -670,7 +670,7 @@ export default function AdminBasket() {
                             }
                           }}
                           disabled={removeItemMutation.isPending}
-                          className="h-9 w-9 bg-red-50 dark:bg-red-950/30 text-red-500 dark:text-red-400 rounded-lg flex items-center justify-center hover:bg-red-100 dark:hover:bg-red-950/50 transition-colors"
+                          className="h-9 w-9 bg-red-50 dark:bg-red-950/30 text-red-500 dark:text-red-400 rounded-lg flex items-center justify-center hover:bg-red-100 dark:hover:bg-red-950/50 transition-colors border border-red-200 dark:border-red-800"
                           title="Excluir item"
                         >
                           <Trash2 className="h-4 w-4" />
