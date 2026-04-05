@@ -82,7 +82,7 @@ function PinScreen({ onUnlock }: { onUnlock: () => void }) {
     
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-        redirectTo: `${window.location.origin}/superadmin`,
+        redirectTo: `${window.location.origin}/reset-password`,
       });
 
       if (error) throw error;
