@@ -334,10 +334,17 @@ export default function CustomerTracking() {
               <p className="font-bold text-xl text-foreground">{order.customer_name}</p>
             </div>
             <div className="text-right">
-              <p className="text-xs text-muted-foreground mb-1">Total</p>
-              <p className="text-2xl font-extrabold text-primary">
-                R$ {order.total.toFixed(2).replace(".", ",")}
+              <p className="text-xs text-muted-foreground mb-1">
+                {(order as any).receipt_total ? 'Total (Cupom Fiscal)' : 'Total'}
               </p>
+              <p className="text-2xl font-extrabold text-primary">
+                R$ {((order as any).receipt_total || order.total).toFixed(2).replace(".", ",")}
+              </p>
+              {(order as any).receipt_total && (order as any).receipt_total !== order.total && (
+                <p className="text-xs text-muted-foreground line-through mt-1">
+                  Estimado: R$ {order.total.toFixed(2).replace(".", ",")}
+                </p>
+              )}
             </div>
           </div>
 
@@ -410,25 +417,26 @@ export default function CustomerTracking() {
           {(order as any).receipt_photo_url && (
             <div className="mb-4">
               <p className="text-xs font-bold text-muted-foreground mb-3">📸 CUPOM FISCAL</p>
-              <div className="bg-white rounded-xl border-2 border-emerald-200 overflow-hidden">
+              <div className="bg-white dark:bg-slate-800 rounded-xl border-2 border-emerald-200 dark:border-emerald-700 overflow-hidden">
                 <img 
                   src={(order as any).receipt_photo_url} 
                   alt="Cupom Fiscal" 
                   className="w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
                   onClick={() => window.open((order as any).receipt_photo_url, '_blank')}
                 />
-                <div className="p-3 bg-emerald-50 border-t border-emerald-200">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs font-semibold text-emerald-800">
+                <div className="p-3 bg-emerald-50 dark:bg-emerald-900/30 border-t border-emerald-200 dark:border-emerald-700">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">
                       Registrado em: {new Date((order as any).receipt_uploaded_at).toLocaleString("pt-BR")}
                     </span>
-                    {(order as any).receipt_total && (
-                      <span className="text-sm font-bold text-emerald-700">
-                        R$ {(order as any).receipt_total.toFixed(2).replace(".", ",")}
-                      </span>
-                    )}
                   </div>
-                  <p className="text-xs text-emerald-600 mt-1">
+                  <div className="flex justify-between items-center p-2 bg-white dark:bg-slate-800 rounded-lg">
+                    <span className="text-sm font-bold text-slate-700 dark:text-slate-300">Valor Total:</span>
+                    <span className="text-xl font-extrabold text-emerald-700 dark:text-emerald-400">
+                      R$ {((order as any).receipt_total || order.total).toFixed(2).replace(".", ",")}
+                    </span>
+                  </div>
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-2 text-center">
                     ✓ Clique na imagem para ampliar
                   </p>
                 </div>

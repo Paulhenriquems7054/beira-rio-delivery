@@ -6,6 +6,7 @@ import { CheckoutForm } from "@/components/CheckoutForm";
 import { ProductSearch } from "@/components/ProductSearch";
 import { CategoryFilter } from "@/components/CategoryFilter";
 import { WeightPickerModal } from "@/components/WeightPickerModal";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { ShoppingCart, CheckCircle2, Leaf, Package, Store } from "lucide-react";
 import { toast } from "sonner";
 import { useParams, useNavigate } from "react-router-dom";
@@ -320,7 +321,7 @@ export default function Index() {
 
   /* ─── Cesta + Checkout ─── */
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background dark:bg-slate-900 flex flex-col">
       {/* Header */}
       <header className="gradient-hero px-4 py-5 shadow-md">
         <div className="mx-auto max-w-lg flex items-center gap-3">
@@ -331,12 +332,13 @@ export default function Index() {
               className="w-full h-full object-contain"
             />
           </div>
-          <div>
+          <div className="flex-1">
             <h1 className="text-base font-extrabold text-white leading-tight">
               {store.name}
             </h1>
             <p className="text-xs text-white/75">{store.description || "Hortifruti fresquinho na sua porta 🌿"}</p>
           </div>
+          <ThemeToggle variant="compact" />
         </div>
       </header>
 

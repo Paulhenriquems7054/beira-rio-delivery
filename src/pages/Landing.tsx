@@ -3,6 +3,7 @@ import { ArrowRight, Leaf, Truck, ShieldCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function Landing() {
   const navigate = useNavigate();
@@ -31,9 +32,9 @@ export default function Landing() {
   };
 
   return (
-    <div className="min-h-screen bg-[hsl(120,12%,95%)] overflow-x-hidden flex flex-col font-sans">
+    <div className="min-h-screen bg-[hsl(120,12%,95%)] dark:bg-slate-900 overflow-x-hidden flex flex-col font-sans">
       {/* Navbar Minimalista */}
-      <nav className="w-full px-6 py-5 flex items-center justify-between sticky top-0 bg-[hsl(120,12%,95%)]/80 backdrop-blur-md z-50">
+      <nav className="w-full px-6 py-5 flex items-center justify-between sticky top-0 bg-[hsl(120,12%,95%)]/80 dark:bg-slate-900/80 backdrop-blur-md z-50">
         <div className="flex items-center gap-2.5">
           <div className="h-10 w-10 min-w-[40px] rounded-xl gradient-hero flex items-center justify-center text-white shadow-button overflow-hidden p-1.5">
             <img 
@@ -42,8 +43,9 @@ export default function Landing() {
               className="w-full h-full object-contain"
             />
           </div>
-          <span className="font-extrabold text-xl text-slate-800 tracking-tight hidden sm:block">horti<span className="text-emerald-600">delivery</span></span>
+          <span className="font-extrabold text-xl text-slate-800 dark:text-slate-100 tracking-tight hidden sm:block">horti<span className="text-emerald-600 dark:text-emerald-400">delivery</span></span>
         </div>
+        <ThemeToggle variant="compact" className="bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200" />
       </nav>
 
       <main className="flex-1 flex flex-col px-4 mx-auto w-full max-w-5xl animate-fade-in relative">
@@ -62,12 +64,12 @@ export default function Landing() {
             />
           </div>
           
-          <h1 className="text-5xl md:text-7xl font-black text-slate-900 leading-[1.05] tracking-tight mb-6">
+          <h1 className="text-5xl md:text-7xl font-black text-slate-900 dark:text-slate-100 leading-[1.05] tracking-tight mb-6">
             O melhor da colheita,<br className="hidden md:block"/>
-            <span className="text-emerald-600">direto para sua mesa.</span>
+            <span className="text-emerald-600 dark:text-emerald-400">direto para sua mesa.</span>
           </h1>
           
-          <p className="text-lg md:text-xl text-slate-500 font-medium mb-12 max-w-2xl mx-auto leading-relaxed">
+          <p className="text-lg md:text-xl text-slate-500 dark:text-slate-400 font-medium mb-12 max-w-2xl mx-auto leading-relaxed">
             Descubra catálogos exclusivos de produtores locais. Monte sua cesta 
             com alimentos 100% frescos e receba no conforto do seu lar.
           </p>

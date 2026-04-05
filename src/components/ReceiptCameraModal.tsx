@@ -110,6 +110,14 @@ export function ReceiptCameraModal({
     setMode('uploading');
 
     try {
+      // Valida o valor do cupom
+      const receiptValue = parseFloat(receiptTotal);
+      if (!receiptValue || receiptValue <= 0) {
+        toast.error('Por favor, informe o valor total do cupom');
+        setMode('preview');
+        return;
+      }
+
       // Converte base64 para blob
       const response = await fetch(capturedImage);
       const blob = await response.blob();
@@ -133,19 +141,20 @@ export function ReceiptCameraModal({
         .from('order-receipts')
         .getPublicUrl(filePath);
 
-      // Atualiza o pedido com a URL da foto
+      // Atualiza o pedido com a URL da foto E o valor total do cupom
       const { error: updateError } = await supabase
         .from('orders')
         .update({
           receipt_photo_url: urlData.publicUrl,
           receipt_uploaded_at: new Date().toISOString(),
-          receipt_total: parseFloat(receiptTotal) || orderTotal
+          receipt_total: receiptValue,
+          total: receiptValue // ATUALIZA O TOTAL DO PEDIDO COM O VALOR DO CUPOM
         })
         .eq('id', orderId);
 
       if (updateError) throw updateError;
 
-      toast.success('Cupom registrado com sucesso! 📸');
+      toast.success(`Cupom registrado! Valor atualizado: R$ ${receiptValue.toFixed(2)} 📸`);
       onSuccess();
       onClose();
     } catch (error: any) {
@@ -237,19 +246,35 @@ export function ReceiptCameraModal({
               </div>
 
               <div>
-                <label className="text-sm font-bold text-foreground mb-2 block">
+                <label className="text-sm font-bold text-foreground mb-2 block flex items-center gap-2">
+                  <span className="text-red-500">*</span>
                   Valor Total do Cupom (R$)
                 </label>
                 <input
                   type="text"
                   inputMode="decimal"
                   value={receiptTotal}
-                  onChange={(e) => setReceiptTotal(e.target.value.replace(/[^0-9.,]/g, ''))}
-                  className="w-full h-12 px-4 border-2 border-slate-300 rounded-xl text-lg font-bold text-center focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  placeholder="0.00"
+                  onChange={(e) => {
+                    // Permite apenas números, vírgula e ponto
+                    const value = e.target.value.replace(/[^0-9.,]/g, '');
+                    setReceiptTotal(value);
+                  }}
+                  className="w-full h-12 px-4 border-2 border-emerald-300 rounded-xl text-lg font-bold text-center focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  placeholder="0,00"
+                  autoFocus
                 />
-                <p className="text-xs text-muted-foreground mt-1 text-center">
-                  Valor do pedido: R$ {orderTotal.toFixed(2).replace(".", ",")}
+                <div className="flex justify-between items-center mt-2">
+                  <p className="text-xs text-muted-foreground">
+                    Valor estimado: R$ {orderTotal.toFixed(2).replace(".", ",")}
+                  </p>
+                  {parseFloat(receiptTotal.replace(',', '.')) > 0 && (
+                    <p className="text-xs font-bold text-emerald-600">
+                      ✓ Valor confirmado
+                    </p>
+                  )}
+                </div>
+                <p className="text-xs text-amber-600 mt-2 font-semibold">
+                  ⚠️ Este valor substituirá o total do pedido
                 </p>
               </div>
 
@@ -263,12 +288,19 @@ export function ReceiptCameraModal({
                 </button>
                 <button
                   onClick={uploadReceipt}
-                  className="flex-1 h-12 rounded-xl bg-emerald-500 text-white font-bold hover:bg-emerald-600 transition-colors flex items-center justify-center gap-2"
+                  disabled={!receiptTotal || parseFloat(receiptTotal.replace(',', '.')) <= 0}
+                  className="flex-1 h-12 rounded-xl bg-emerald-500 text-white font-bold hover:bg-emerald-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Check className="h-4 w-4" />
                   Confirmar e Enviar
                 </button>
               </div>
+              
+              {(!receiptTotal || parseFloat(receiptTotal.replace(',', '.')) <= 0) && (
+                <p className="text-xs text-red-600 text-center mt-2 font-semibold">
+                  ⚠️ Informe o valor total do cupom para continuar
+                </p>
+              )}
             </div>
           )}
 

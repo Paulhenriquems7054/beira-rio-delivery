@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { logAuditEvent } from "@/hooks/useAuditLog";
 import { Leaf, Eye, EyeOff, Store, LinkIcon } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function Login() {
     const [mode, setMode] = useState<"login" | "register">("login");
@@ -178,9 +179,14 @@ export default function Login() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
+        <div className="min-h-screen flex items-center justify-center bg-background dark:bg-slate-900 p-4 relative overflow-hidden">
+            {/* Theme Toggle - Canto superior direito */}
+            <div className="absolute top-6 right-6 z-20">
+                <ThemeToggle />
+            </div>
+            
             {/* Background elements */}
-            <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-emerald-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20" />
+            <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-emerald-400 dark:bg-emerald-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 dark:opacity-10" />
             
             <div className="w-full max-w-sm space-y-6 relative z-10">
                 <div className="text-center space-y-2">

@@ -2,6 +2,7 @@ import { useRealtimeOrders, updateOrderStatus, deleteOrder } from "@/hooks/useOr
 import { OrderStatusBadge } from "@/components/OrderStatusBadge";
 import { WeighingModal } from "@/components/WeighingModal";
 import { ReceiptCameraModal } from "@/components/ReceiptCameraModal";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   Leaf,
   Package,
@@ -160,7 +161,7 @@ export default function Admin() {
     .reduce((acc, current) => acc + current.total, 0);
 
   return (
-    <div className="min-h-screen bg-[hsl(120,12%,95%)]">
+    <div className="min-h-screen bg-[hsl(120,12%,95%)] dark:bg-slate-900">
       {/* Header */}
       <header className="gradient-hero px-4 py-5 shadow-md sticky top-0 z-20">
         <div className="mx-auto max-w-2xl flex items-center justify-between gap-3">
@@ -183,13 +184,14 @@ export default function Admin() {
           </div>
           {/* Indicador live e Logout */}
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 bg-white/20 rounded-full px-3 py-1">
+            <div className="flex items-center gap-1.5 bg-white/20 dark:bg-slate-800/50 rounded-full px-3 py-1">
               <span className="h-2 w-2 rounded-full bg-emerald-300 animate-pulse-dot" />
               <span className="text-xs font-bold text-white hidden sm:inline">Ao vivo</span>
             </div>
+            <ThemeToggle variant="compact" />
             <button
               onClick={handleLogout}
-              className="h-8 w-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+              className="h-8 w-8 rounded-full bg-white/10 dark:bg-slate-800/50 flex items-center justify-center text-white hover:bg-white/20 dark:hover:bg-slate-700/50 transition-colors"
             >
               <LogOut className="h-4 w-4" />
             </button>
