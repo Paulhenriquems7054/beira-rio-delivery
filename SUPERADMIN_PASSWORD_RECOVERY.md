@@ -151,9 +151,11 @@ const handleForgotPassword = async (e: React.FormEvent) => {
 Usa o método nativo do Supabase Auth:
 ```typescript
 supabase.auth.resetPasswordForEmail(email, {
-  redirectTo: `${window.location.origin}/superadmin`,
+  redirectTo: `${window.location.origin}/reset-password`,
 })
 ```
+
+**IMPORTANTE:** O redirect agora aponta para `/reset-password`, uma página dedicada para redefinição de senha.
 
 ---
 
@@ -194,10 +196,14 @@ Certifique-se de que o Supabase está configurado para enviar emails:
 5. **Aguarda:** Mensagem de sucesso
 6. **Verifica:** Email na caixa de entrada
 7. **Clica:** No link do email
-8. **Redireciona:** Para página de redefinição do Supabase
-9. **Define:** Nova senha
-10. **Retorna:** Para `/superadmin`
-11. **Faz login:** Com a nova senha
+8. **Redireciona:** Para `/reset-password` (página dedicada)
+9. **Vê:** Formulário de redefinição de senha
+10. **Digita:** Nova senha (mínimo 6 caracteres)
+11. **Confirma:** Senha digitando novamente
+12. **Clica:** "Redefinir Senha"
+13. **Vê:** Mensagem de sucesso
+14. **Redireciona:** Automaticamente para `/superadmin`
+15. **Faz login:** Com a nova senha
 
 ### Cenário 2: Email Não Cadastrado
 
@@ -360,14 +366,28 @@ Equipe Horti Delivery
 
 ---
 
-## 📁 Arquivo Modificado
+## 📁 Arquivos Modificados/Criados
 
-- ✅ `src/pages/SuperAdmin.tsx`
-  - Adicionado estado de recuperação
-  - Adicionada tela de "Esqueci minha senha"
-  - Adicionada função `handleForgotPassword`
-  - Adicionada tela de sucesso
-  - Adicionado botão "Voltar ao Login"
+1. ✅ `src/pages/SuperAdmin.tsx`
+   - Adicionado estado de recuperação
+   - Adicionada tela de "Esqueci minha senha"
+   - Adicionada função `handleForgotPassword`
+   - Adicionada tela de sucesso
+   - Adicionado botão "Voltar ao Login"
+   - Redirect atualizado para `/reset-password`
+
+2. ✅ `src/pages/ResetPassword.tsx` (NOVO!)
+   - Página dedicada para redefinição de senha
+   - Validação de token de recuperação
+   - Formulário com nova senha e confirmação
+   - Toggle para mostrar/ocultar senha
+   - Validações de segurança
+   - Feedback visual completo
+   - Redirect automático após sucesso
+
+3. ✅ `src/App.tsx`
+   - Adicionada rota `/reset-password`
+   - Import do componente ResetPassword
 
 ---
 
