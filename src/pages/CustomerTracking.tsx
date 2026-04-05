@@ -406,6 +406,36 @@ export default function CustomerTracking() {
             </div>
           )}
 
+          {/* Cupom Fiscal */}
+          {(order as any).receipt_photo_url && (
+            <div className="mb-4">
+              <p className="text-xs font-bold text-muted-foreground mb-3">📸 CUPOM FISCAL</p>
+              <div className="bg-white rounded-xl border-2 border-emerald-200 overflow-hidden">
+                <img 
+                  src={(order as any).receipt_photo_url} 
+                  alt="Cupom Fiscal" 
+                  className="w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
+                  onClick={() => window.open((order as any).receipt_photo_url, '_blank')}
+                />
+                <div className="p-3 bg-emerald-50 border-t border-emerald-200">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-semibold text-emerald-800">
+                      Registrado em: {new Date((order as any).receipt_uploaded_at).toLocaleString("pt-BR")}
+                    </span>
+                    {(order as any).receipt_total && (
+                      <span className="text-sm font-bold text-emerald-700">
+                        R$ {(order as any).receipt_total.toFixed(2).replace(".", ",")}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-emerald-600 mt-1">
+                    ✓ Clique na imagem para ampliar
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Timeline de status */}
           <StatusTimeline status={order.status} />
         </div>
