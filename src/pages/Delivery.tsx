@@ -125,25 +125,25 @@ function PinScreen({ storeName, onUnlock }: { storeName: string; onUnlock: (pin:
 
   // Allow parent to signal error
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 relative">
+    <div className="min-h-screen bg-background dark:bg-slate-900 flex flex-col items-center justify-center p-6 relative">
       {/* Theme Toggle - Canto superior direito */}
       <div className="absolute top-6 right-6 z-20">
-        <ThemeToggle className="bg-slate-800 text-slate-300 hover:bg-slate-700" />
+        <ThemeToggle className="bg-muted dark:bg-slate-800 text-foreground dark:text-slate-300 hover:bg-muted/80 dark:hover:bg-slate-700" />
       </div>
 
       <div className="mb-8 flex flex-col items-center gap-3">
         <div className="h-16 w-16 rounded-2xl bg-emerald-500 flex items-center justify-center shadow-lg">
           <Bike className="h-9 w-9 text-white" />
         </div>
-        <h1 className="text-2xl font-extrabold text-white">Área do Entregador</h1>
-        <p className="text-slate-400 text-sm text-center">{storeName}</p>
-        <p className="text-slate-500 text-xs">Digite o PIN de acesso</p>
+        <h1 className="text-2xl font-extrabold text-foreground dark:text-white">Área do Entregador</h1>
+        <p className="text-muted-foreground dark:text-slate-400 text-sm text-center">{storeName}</p>
+        <p className="text-muted-foreground/70 dark:text-slate-500 text-xs">Digite o PIN de acesso</p>
       </div>
 
       <div className="flex gap-4 mb-8">
         {[0, 1, 2, 3].map(i => (
           <div key={i} className={`h-4 w-4 rounded-full transition-all duration-150 ${
-            i < pin.length ? (error ? "bg-red-500" : "bg-emerald-400") : "bg-slate-600"
+            i < pin.length ? (error ? "bg-red-500" : "bg-emerald-400") : "bg-muted-foreground/30 dark:bg-slate-600"
           }`} />
         ))}
       </div>
@@ -156,8 +156,8 @@ function PinScreen({ storeName, onUnlock }: { storeName: string; onUnlock: (pin:
             disabled={d === ""}
             className={`h-16 rounded-2xl text-xl font-bold transition-all active:scale-95 ${
               d === "" ? "invisible" :
-              d === "⌫" ? "bg-slate-700 text-slate-300 hover:bg-slate-600" :
-              "bg-slate-700 text-white hover:bg-slate-600"
+              d === "⌫" ? "bg-muted dark:bg-slate-700 text-foreground dark:text-slate-300 hover:bg-muted/80 dark:hover:bg-slate-600" :
+              "bg-muted dark:bg-slate-700 text-foreground dark:text-white hover:bg-muted/80 dark:hover:bg-slate-600"
             }`}
           >
             {d}
@@ -165,7 +165,7 @@ function PinScreen({ storeName, onUnlock }: { storeName: string; onUnlock: (pin:
         ))}
       </div>
 
-      {error && <p className="mt-6 text-red-400 font-bold text-sm animate-pulse">PIN incorreto</p>}
+      {error && <p className="mt-6 text-red-500 dark:text-red-400 font-bold text-sm animate-pulse">PIN incorreto</p>}
     </div>
   );
 }
@@ -178,32 +178,32 @@ function OrderCard({ order }: { order: Order }) {
   const isReady = order.status === "ready_for_delivery";
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-      <div className="bg-amber-50 border-b border-amber-100 px-4 py-3 flex items-center justify-between">
+    <div className="bg-card dark:bg-white rounded-2xl shadow-sm border border-border dark:border-slate-200 overflow-hidden">
+      <div className="bg-amber-50 dark:bg-amber-50 border-b border-amber-100 dark:border-amber-100 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Package className="h-4 w-4 text-amber-600" />
           <span className="text-xs font-bold text-amber-700 uppercase tracking-wide">
             {isReady ? "Pronto para rota" : "Na Rota"}
           </span>
         </div>
-        <span className="text-xs text-slate-400 font-mono">#{order.id.split("-")[0]}</span>
+        <span className="text-xs text-muted-foreground dark:text-slate-400 font-mono">#{order.id.split("-")[0]}</span>
       </div>
 
       <div className="p-4 space-y-3">
         <div>
-          <p className="font-extrabold text-lg text-slate-800">{order.customer_name}</p>
+          <p className="font-extrabold text-lg text-foreground dark:text-slate-800">{order.customer_name}</p>
           <p className="text-2xl font-black text-emerald-600 mt-0.5">
             R$ {order.total.toFixed(2).replace(".", ",")}
           </p>
         </div>
 
-        <div className="flex items-start gap-2 bg-slate-50 rounded-xl p-3 border border-slate-100">
-          <MapPin className="h-4 w-4 text-slate-500 shrink-0 mt-0.5" />
-          <p className="text-sm text-slate-700 font-medium leading-snug">{order.address}</p>
+        <div className="flex items-start gap-2 bg-muted dark:bg-slate-50 rounded-xl p-3 border border-border dark:border-slate-100">
+          <MapPin className="h-4 w-4 text-muted-foreground dark:text-slate-500 shrink-0 mt-0.5" />
+          <p className="text-sm text-foreground dark:text-slate-700 font-medium leading-snug">{order.address}</p>
         </div>
 
         {order.notes && (
-          <div className="bg-yellow-50 rounded-xl p-3 border border-yellow-100">
+          <div className="bg-yellow-50 dark:bg-yellow-50 rounded-xl p-3 border border-yellow-100 dark:border-yellow-100">
             <p className="text-xs font-bold text-yellow-700 mb-1">Observação:</p>
             <p className="text-sm text-yellow-800">{order.notes}</p>
           </div>
@@ -244,11 +244,11 @@ function OrderCard({ order }: { order: Order }) {
           </button>
         ) : (
           <div className="space-y-2">
-            <p className="text-center text-sm font-bold text-slate-600">Confirmar que entregou?</p>
+            <p className="text-center text-sm font-bold text-muted-foreground dark:text-slate-600">Confirmar que entregou?</p>
             <div className="flex gap-2">
               <button
                 onClick={() => setConfirming(false)}
-                className="flex-1 h-12 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50"
+                className="flex-1 h-12 rounded-xl border border-border dark:border-slate-200 text-foreground dark:text-slate-600 font-bold text-sm hover:bg-muted dark:hover:bg-slate-50"
               >
                 Cancelar
               </button>
@@ -284,18 +284,18 @@ export default function Delivery() {
 
   if (storeLoading) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <Loader2 className="h-8 w-8 text-emerald-400 animate-spin" />
+      <div className="min-h-screen bg-background dark:bg-slate-900 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 text-emerald-500 animate-spin" />
       </div>
     );
   }
 
   if (!store) {
     return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 gap-4">
-        <Bike className="h-12 w-12 text-slate-500" />
-        <p className="text-slate-400 font-bold text-lg">Loja não encontrada</p>
-        <p className="text-slate-500 text-sm">Verifique o link com o seu gestor</p>
+      <div className="min-h-screen bg-background dark:bg-slate-900 flex flex-col items-center justify-center p-6 gap-4">
+        <Bike className="h-12 w-12 text-muted-foreground dark:text-slate-500" />
+        <p className="text-foreground dark:text-slate-400 font-bold text-lg">Loja não encontrada</p>
+        <p className="text-muted-foreground dark:text-slate-500 text-sm">Verifique o link com o seu gestor</p>
       </div>
     );
   }
@@ -317,8 +317,8 @@ export default function Delivery() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <header className="bg-slate-900 px-4 py-4 sticky top-0 z-10 shadow-md">
+    <div className="min-h-screen bg-background dark:bg-slate-100">
+      <header className="bg-slate-900 dark:bg-slate-900 px-4 py-4 sticky top-0 z-10 shadow-md">
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-xl bg-emerald-500 flex items-center justify-center">
@@ -353,17 +353,17 @@ export default function Delivery() {
         {ordersLoading && (
           <div className="flex items-center justify-center py-16 gap-3">
             <Loader2 className="h-6 w-6 text-emerald-500 animate-spin" />
-            <p className="text-slate-500 font-semibold">Carregando entregas...</p>
+            <p className="text-muted-foreground font-semibold">Carregando entregas...</p>
           </div>
         )}
 
         {!ordersLoading && orders.length === 0 && (
           <div className="text-center py-16">
-            <div className="h-20 w-20 rounded-full bg-slate-200 flex items-center justify-center mx-auto mb-4">
-              <CheckCircle2 className="h-10 w-10 text-slate-400" />
+            <div className="h-20 w-20 rounded-full bg-muted dark:bg-slate-200 flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 className="h-10 w-10 text-muted-foreground dark:text-slate-400" />
             </div>
-            <h2 className="text-xl font-extrabold text-slate-700 mb-2">Tudo entregue!</h2>
-            <p className="text-slate-500 text-sm">Nenhum pedido na rota no momento.</p>
+            <h2 className="text-xl font-extrabold text-foreground dark:text-slate-700 mb-2">Tudo entregue!</h2>
+            <p className="text-muted-foreground dark:text-slate-500 text-sm">Nenhum pedido na rota no momento.</p>
           </div>
         )}
 
