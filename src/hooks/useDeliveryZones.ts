@@ -29,7 +29,10 @@ export function useDeliveryZones(storeId?: string) {
 
       const { data, error } = await query;
       if (error) throw error;
-      return data as DeliveryZone[];
+      return (data as DeliveryZone[]).map((zone) => ({
+        ...zone,
+        neighborhood: zone.neighborhood ?? zone.name,
+      }));
     },
   });
 }

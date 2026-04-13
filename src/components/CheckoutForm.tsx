@@ -328,7 +328,7 @@ export function CheckoutForm({
               <option value="" disabled>Selecione seu bairro...</option>
               {zones.map(z => (
                 <option key={z.id} value={z.id}>
-                  {z.name} - R$ {z.fee.toFixed(2).replace(".", ",")}
+                  {(z.name || z.neighborhood || "Bairro sem nome")} - R$ {z.fee.toFixed(2).replace(".", ",")}
                 </option>
               ))}
             </select>

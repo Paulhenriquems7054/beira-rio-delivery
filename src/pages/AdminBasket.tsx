@@ -399,7 +399,7 @@ export default function AdminBasket() {
             <button 
               onClick={() => {
                 if(newZoneName.trim() && !isNaN(parseFloat(newZoneFee))) {
-                  addZone.mutate({ neighborhood: newZoneName, fee: parseFloat(newZoneFee) }, {
+                  addZone.mutate({ name: newZoneName, fee: parseFloat(newZoneFee) }, {
                     onSuccess: () => {
                       setNewZoneName(""); setNewZoneFee(""); toast.success("Bairro adicionado");
                     }
@@ -415,8 +415,10 @@ export default function AdminBasket() {
           <div className="space-y-2">
             {zones?.length === 0 && <p className="text-xs text-muted-foreground text-center bg-muted p-3 rounded-lg border border-border">Nenhum bairro cadastrado. Seus clientes enviarão pedidos sem taxa de frete no momento.</p>}
             {zones?.map(z => (
-              <div key={z.id} className="flex items-center justify-between p-2.5 px-3 rounded-xl bg-muted border border-border">
-                <span className="font-bold text-sm text-foreground">{z.neighborhood}</span>
+              <div key={z.id} className="flex items-center justify-between gap-3 p-2.5 px-3 rounded-xl bg-muted border border-border">
+                <span className="font-bold text-sm text-foreground flex-1 min-w-0 truncate">
+                  {z.name || z.neighborhood || "Bairro sem nome"}
+                </span>
                 <div className="flex items-center gap-3">
                   <span className="text-sm text-primary font-bold">R$ {z.fee.toFixed(2).replace(".", ",")}</span>
                   <button onClick={() => deleteZone.mutate(z.id)} className="text-red-400 p-1 hover:bg-red-50 hover:text-red-500 rounded-lg transition-colors"><Trash2 className="h-4 w-4" /></button>
