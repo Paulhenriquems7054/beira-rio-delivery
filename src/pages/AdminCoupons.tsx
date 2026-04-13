@@ -78,7 +78,8 @@ export default function AdminCoupons() {
         discount_value: Number(form.discount_value),
         min_order: Number(form.min_order) || 0,
         max_uses: form.max_uses ? Number(form.max_uses) : undefined,
-        expires_at: form.expires_at || undefined,
+        // Input date should expire at end of selected day.
+        expires_at: form.expires_at ? `${form.expires_at}T23:59:59` : undefined,
         active: form.active,
         store_id: form.store_id || undefined,
       };
@@ -184,6 +185,9 @@ export default function AdminCoupons() {
                   value={form.expires_at}
                   onChange={(e) => setForm((f) => ({ ...f, expires_at: e.target.value }))}
                 />
+                <p className="text-xs text-muted-foreground -mt-1">
+                  Expira ao final do dia selecionado.
+                </p>
                 <Select value={form.store_id || "all"} onValueChange={(v) => setForm((f) => ({ ...f, store_id: v === "all" ? "" : v }))}>
                   <SelectTrigger>
                     <SelectValue placeholder="Loja (opcional)" />

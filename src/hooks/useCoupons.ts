@@ -15,6 +15,21 @@ export interface Coupon {
   created_at: string;
 }
 
+function getCouponExpiryDate(expiresAt?: string) {
+  if (!expiresAt) return null;
+
+  // Date-only values (YYYY-MM-DD) are valid until local end of day.
+  const dateOnlyMatch = expiresAt.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnlyMatch) {
+    const year = Number(dateOnlyMatch[1]);
+    const month = Number(dateOnlyMatch[2]) - 1;
+    const day = Number(dateOnlyMatch[3]);
+    return new Date(year, month, day, 23, 59, 59, 999);
+  }
+
+  return new Date(expiresAt);
+}
+
 export function useCoupons(storeId?: string) {
   return useQuery({
     queryKey: ["coupons", storeId],
@@ -44,7 +59,8 @@ export function useValidateCoupon() {
       const coupon = data as Coupon;
       
       // Validations
-      if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
+      const expiryDate = getCouponExpiryDate(coupon.expires_at);
+      if (expiryDate && expiryDate.getTime() < Date.now()) {
         throw new Error("Cupom expirado");
       }
       if (coupon.max_uses && coupon.used_count >= coupon.max_uses) {
