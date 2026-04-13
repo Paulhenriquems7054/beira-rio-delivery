@@ -122,6 +122,9 @@ function useRealtimeOrder(orderId: string, phone: string) {
       return;
     }
 
+    // Normaliza o telefone para garantir compatibilidade
+    const normalizedPhone = phone.replace(/\D/g, "");
+
     // Busca inicial com itens
     supabase
       .from("orders")
@@ -142,7 +145,7 @@ function useRealtimeOrder(orderId: string, phone: string) {
         )
       `)
       .eq("id", orderId)
-      .eq("phone", phone)
+      .eq("phone", normalizedPhone)
       .single()
       .then(({ data, error }) => {
         if (!error && data) {
