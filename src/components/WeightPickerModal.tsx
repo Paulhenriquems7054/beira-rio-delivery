@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Minus, Plus, Scale } from "lucide-react";
 import type { BasketProduct } from "@/hooks/useActiveBasket";
@@ -13,17 +13,32 @@ const QUICK_WEIGHTS = [0.25, 0.5, 0.75, 1, 1.5, 2];
 
 export function WeightPickerModal({ product, onClose, onConfirm }: Props) {
   const [weight, setWeight] = useState(product?.min_weight ?? 0.25);
+  const [customWeight, setCustomWeight] = useState("");
   const step = product?.step_weight ?? 0.25;
   const pricePerKg = product?.price_per_kg ?? product?.price ?? 0;
   const total = weight * pricePerKg;
 
   if (!product) return null;
 
+  useEffect(() => {
+    if (!product) return;
+    setWeight(product.min_weight ?? 0.25);
+    setCustomWeight("");
+  }, [product]);
+
   const handleStep = (dir: 1 | -1) => {
     setWeight(prev => {
       const next = Math.round((prev + dir * step) * 100) / 100;
       return Math.max(step, next);
     });
+  };
+
+  const handleCustomWeightChange = (value: string) => {
+    setCustomWeight(value);
+    const parsed = Number(value.replace(",", "."));
+    if (Number.isFinite(parsed) && parsed >= step) {
+      setWeight(Math.round(parsed * 100) / 100);
+    }
   };
 
   return (
@@ -84,6 +99,22 @@ export function WeightPickerModal({ product, onClose, onConfirm }: Props) {
                 {w < 1 ? `${w * 1000}g` : `${w}kg`}
               </button>
             ))}
+          </div>
+
+          {/* Peso livre em kg */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-muted-foreground">
+              Outro peso (kg) - para pedidos acima de 2kg
+            </label>
+            <input
+              type="number"
+              min={step}
+              step={step}
+              placeholder="Ex: 5"
+              value={customWeight}
+              onChange={(e) => handleCustomWeightChange(e.target.value)}
+              className="w-full h-11 rounded-xl border border-border px-3 text-sm font-semibold bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+            />
           </div>
 
           {/* Total estimado */}
