@@ -79,6 +79,7 @@ export function CheckoutForm({
 
   const currentZoneData = zones?.find(z => z.id === selectedZone);
   const deliveryFee = currentZoneData ? currentZoneData.fee : 0;
+  const couponValidationTotal = Math.max(basketPrice, estimatedTotal || 0);
   
   // Calculate discount
   let discount = 0;
@@ -112,7 +113,7 @@ export function CheckoutForm({
       const coupon = await validateCoupon.mutateAsync({
         code: couponCode,
         storeId,
-        orderTotal: basketPrice,
+        orderTotal: couponValidationTotal,
       });
       setAppliedCoupon(coupon);
       toast.success(`Cupom aplicado! ${coupon.discount_type === "percentage" ? `${coupon.discount_value}%` : `R$ ${coupon.discount_value}`} OFF`);
