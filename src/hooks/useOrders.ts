@@ -110,7 +110,13 @@ export function useRealtimeOrders(storeId?: string) {
     };
   }, [storeId]);
 
-  return { orders, loading };
+  // Função para remover pedido manualmente (após exclusão bem-sucedida)
+  const removeOrder = (orderId: string) => {
+    console.log('🗑️ [useRealtimeOrders] Manually removing order:', orderId);
+    setOrders((prev) => prev.filter((o) => o.id !== orderId));
+  };
+
+  return { orders, loading, removeOrder };
 }
 
 export async function updateOrderStatus(orderId: string, status: string) {

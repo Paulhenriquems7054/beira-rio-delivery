@@ -34,7 +34,7 @@ type StatusFilter = "all" | "pending" | "preparing" | "ready_for_delivery" | "de
 
 export default function Admin() {
   const { store: tenantStore } = useTenant();
-  const { orders, loading } = useRealtimeOrders(tenantStore?.id);
+  const { orders, loading, removeOrder } = useRealtimeOrders(tenantStore?.id);
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [updating, setUpdating] = useState<string | null>(null);
   const [storeSlug, setStoreSlug] = useState<string>("default");
@@ -136,6 +136,8 @@ export default function Admin() {
     setDeletingOrder(orderId);
     try {
       await deleteOrder(orderId);
+      // Remove o pedido imediatamente da interface (fallback se realtime falhar)
+      removeOrder(orderId);
       toast.success("Pedido excluído com sucesso");
       setConfirmDelete(null);
     } catch (error) {
