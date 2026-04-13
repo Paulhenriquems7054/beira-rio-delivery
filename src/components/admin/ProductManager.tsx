@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from "@/hooks/useProducts";
+import { useStoreId } from "@/contexts/TenantContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -8,6 +9,7 @@ import { Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 export function ProductManager() {
+  const storeId = useStoreId();
   const { data: products, isLoading } = useProducts();
   const createProduct = useCreateProduct();
   const updateProduct = useUpdateProduct();
@@ -54,6 +56,7 @@ export function ProductManager() {
           price: Number(form.price),
           image_url: form.image_url || null,
           active: form.active,
+          store_id: storeId,
         });
         toast.success("Produto criado!");
       }
