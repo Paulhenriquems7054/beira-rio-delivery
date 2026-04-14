@@ -69,9 +69,10 @@ export function useCreateProduct() {
       const defaultWeightVariance = 0.15;
       const normalizedInput = {
         ...payload,
+        sell_by: payload.sell_by ?? "both",
         average_weight: payload.average_weight ?? defaultAverageWeight,
         weight_variance: payload.weight_variance ?? defaultWeightVariance,
-        price_per_kg: payload.price_per_kg ?? (payload.unit === "un" ? payload.price : undefined),
+        price_per_kg: payload.price_per_kg ?? payload.price,
       };
 
       const { data, error } = await supabase
@@ -101,9 +102,27 @@ export function useDeleteProduct() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("products").delete().eq("id", id);
+      const { error: itemErr } = await supabase
+        .from("basket_items")
+        .delete()
+        .eq("product_id", id);
+      if (itemErr) throw itemErr;
+
+      const { data: deletedProducts, error } = await supabase
+        .from("products")
+        .delete()
+        .eq("id", id)
+        .select("id");
       if (error) throw error;
+      if (!deletedProducts || deletedProducts.length === 0) {
+        throw new Error("Produto não foi excluído no banco.");
+      }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["products"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["products"] });
+      qc.invalidateQueries({ queryKey: ["active-basket"] });
+      qc.invalidateQueries({ queryKey: ["admin-active-basket"] });
+      qc.invalidateQueries({ queryKey: ["all-products"] });
+    },
   });
 }

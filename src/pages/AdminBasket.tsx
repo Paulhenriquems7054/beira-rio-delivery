@@ -200,20 +200,21 @@ export default function AdminBasket() {
 
       const defaultAverageWeight = 0.3;
       const defaultWeightVariance = 0.15;
-      const normalizedPricePerKg = newProductUnit === "un" ? priceVal : undefined;
+      const normalizedPricePerKg = priceVal;
 
       const { data: prodData, error: prodErr } = await supabase
         .from("products")
-        .insert([{ 
-           name: newProductName, 
-           price: priceVal, 
-           unit: newProductUnit,
-           image_url: shouldUploadImage ? null : finalImageUrl,
-           active: true,
-           store_id: effectiveStoreId,
-           average_weight: defaultAverageWeight,
-           weight_variance: defaultWeightVariance,
-           price_per_kg: normalizedPricePerKg,
+        .insert([{
+          name: newProductName,
+          price: priceVal,
+          unit: newProductUnit,
+          image_url: shouldUploadImage ? null : finalImageUrl,
+          active: true,
+          store_id: effectiveStoreId,
+          sell_by: "both",
+          average_weight: defaultAverageWeight,
+          weight_variance: defaultWeightVariance,
+          price_per_kg: normalizedPricePerKg,
         }])
         .select()
         .single();
@@ -282,12 +283,13 @@ export default function AdminBasket() {
       }
       const defaultAverageWeight = 0.3;
       const defaultWeightVariance = 0.15;
-      const itemsWithStore = items.map(i => ({
+      const itemsWithStore = items.map((i) => ({
         ...i,
         store_id: effectiveStoreId,
+        sell_by: "both",
         average_weight: defaultAverageWeight,
         weight_variance: defaultWeightVariance,
-        price_per_kg: i.unit === "un" ? i.price : undefined,
+        price_per_kg: i.price,
       }));
       
       const { data: prods, error: prodErr } = await supabase
@@ -431,22 +433,28 @@ export default function AdminBasket() {
 
   const deleteProductMutation = useMutation({
     mutationFn: async (productId: string) => {
-      // Remove da cesta (soft cleanup)
-      await supabase
+      // Remove itens vinculados à cesta antes de excluir o produto
+      const { error: itemErr } = await supabase
         .from("basket_items")
         .delete()
-        .match({ product_id: productId, store_id: tenantStoreId });
+        .eq("product_id", productId);
+      if (itemErr) throw itemErr;
 
-      // Soft-delete: marca como inativo para não aparecer no app
-      const { error } = await supabase
+      const { data: deletedProducts, error } = await supabase
         .from("products")
-        .update({ active: false, in_stock: false })
-        .eq("id", productId);
+        .delete()
+        .eq("id", productId)
+        .select("id");
       if (error) throw error;
+      if (!deletedProducts || deletedProducts.length === 0) {
+        throw new Error("Produto não foi excluído no banco.");
+      }
     },
     onSuccess: (_data, productId) => {
       toast.success("Produto excluído!");
       queryClient.invalidateQueries({ queryKey: ["admin-active-basket"] });
+      queryClient.invalidateQueries({ queryKey: ["active-basket"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
       if (basket?.id) {
         queryClient.invalidateQueries({ queryKey: ["all-products", basket.id, tenantStoreId] });
         queryClient.setQueryData(["all-products", basket.id, tenantStoreId], (prev: any) => {
