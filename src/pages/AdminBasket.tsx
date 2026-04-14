@@ -429,7 +429,7 @@ export default function AdminBasket() {
         .eq("id", productId);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, productId) => {
       toast.success("Produto excluído!");
       queryClient.invalidateQueries({ queryKey: ["admin-active-basket"] });
       if (basket?.id) {
