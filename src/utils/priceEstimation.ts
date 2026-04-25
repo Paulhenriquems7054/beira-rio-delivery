@@ -90,7 +90,7 @@ export function calculateCartEstimate(
       const qty = cart[p.id] || 0;
       if (qty > 0) {
         if (sellsByUnitFixedPrice(p)) {
-          const unitPrice = p.price_per_unit ?? p.price;
+          const unitPrice = p.price;
           const line = qty * unitPrice;
           unitItemsEstimate += line;
           unitItemsMin += line;

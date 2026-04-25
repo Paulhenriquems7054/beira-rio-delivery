@@ -451,7 +451,7 @@ export default function Index() {
                     }).map(p => {
                       const isFixedUnit = sellsByUnitFixedPrice(p);
                       const estimate = calculateUnitPriceEstimate(p, cart[p.id] || 0);
-                      const fixedLine = (cart[p.id] || 0) * (p.price_per_unit ?? p.price);
+                      const fixedLine = (cart[p.id] || 0) * p.price;
                       return (
                         <div key={p.id} className="flex justify-between text-xs">
                           <span className="text-foreground">
@@ -563,7 +563,7 @@ export default function Index() {
                         sold_by: 'weight'
                       };
                     } else {
-                      const pricePerUnit = (p as any).price_per_unit ?? p.price;
+                      const pricePerUnit = p.price;
                       return { 
                         ...p, 
                         quantity: cart[p.id],

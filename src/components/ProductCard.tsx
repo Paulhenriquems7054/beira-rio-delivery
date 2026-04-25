@@ -51,7 +51,7 @@ export function ProductCard({
   const isAvailable = product.in_stock !== false;
   
   const pricePerKg = product.price_per_kg ?? product.price;
-  const pricePerUnit = (product as any).price_per_unit ?? product.price;
+  const pricePerUnit = product.price;
   const inCart = isWeight ? (cartWeight ?? 0) > 0 : cartQty > 0;
   const isFixedUnitPrice = fixedUnitFromCatalog;
 
