@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { X, Package } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { sellsByUnitFixedPrice } from "@/utils/priceEstimation";
 
 interface OrderDetailsItem {
   id: string;
@@ -12,6 +13,8 @@ interface OrderDetailsItem {
   final_price?: number | null;
   needs_weighing?: boolean | null;
   product_name: string;
+  product_unit?: string | null;
+  product_sell_by?: "unit" | "weight" | "both" | null;
 }
 
 interface OrderDetailsOrder {
@@ -49,7 +52,7 @@ export function OrderDetailsModal({ order, onClose }: Props) {
           actual_weight_kg,
           final_price,
           needs_weighing,
-          product:products(name)
+          product:products(name, unit, sell_by)
         `)
         .eq("order_id", order.id);
 
@@ -65,6 +68,8 @@ export function OrderDetailsModal({ order, onClose }: Props) {
             final_price: item.final_price,
             needs_weighing: item.needs_weighing,
             product_name: item.product?.name || "Produto",
+            product_unit: item.product?.unit,
+            product_sell_by: item.product?.sell_by,
           }))
         );
       } else {
@@ -117,19 +122,33 @@ export function OrderDetailsModal({ order, onClose }: Props) {
             ) : (
               items.map((item) => (
                 <div key={item.id} className="rounded-lg border border-border p-3 bg-card">
+                  {/*
+                    Exibe "(a pesar)" somente quando realmente precisa de pesagem.
+                    Produtos de valor fixo por unidade nunca entram nesse estado.
+                  */}
+                  {(() => {
+                    const isFixedUnit = sellsByUnitFixedPrice({
+                      sell_by: item.product_sell_by ?? item.sold_by,
+                      unit: item.product_unit ?? null,
+                    });
+                    const shouldShowNeedsWeighing = Boolean(item.needs_weighing) && !isFixedUnit;
+
+                    return (
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="font-semibold text-foreground">{item.product_name}</p>
                       <p className="text-xs text-muted-foreground">
                         {item.sold_by === "weight"
                           ? `${item.weight_kg || 0}kg x R$ ${(item.price / (item.weight_kg || 1)).toFixed(2)}`
-                          : item.needs_weighing
+                          : shouldShowNeedsWeighing
                             ? `${item.quantity} unidade(s) (a pesar)`
                             : `${item.quantity} unidade(s)`}
                       </p>
                     </div>
                     <p className="font-bold text-primary">R$ {(item.final_price || item.price || 0).toFixed(2)}</p>
                   </div>
+                    );
+                  })()}
                 </div>
               ))
             )}

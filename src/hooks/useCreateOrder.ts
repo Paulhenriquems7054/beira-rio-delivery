@@ -1,6 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { BasketProduct } from "./useActiveBasket";
+import { sellsByUnitFixedPrice } from "@/utils/priceEstimation";
 
 export interface CreateOrderInput {
   customer_name: string;
@@ -62,7 +63,8 @@ export function useCreateOrder() {
           item.sold_by = 'weight';
         } else {
           item.sold_by = 'unit';
-          item.needs_weighing = true; // Itens por unidade precisam ser pesados
+          // Só marca "a pesar" quando o valor unitário depende de peso estimado.
+          item.needs_weighing = !sellsByUnitFixedPrice(p);
         }
         
         return item;
