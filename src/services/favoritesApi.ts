@@ -12,7 +12,7 @@ interface ApiErrorPayload {
   error?: { message?: string };
 }
 
-async function getAuthHeaders(tenantId: string): Promise<Record<string, string>> {
+async function getAuthHeaders(tenantId: string, clientRequestId: string): Promise<Record<string, string>> {
   const { data, error } = await supabase.auth.getSession();
   const token = data.session?.access_token;
 
@@ -24,6 +24,7 @@ async function getAuthHeaders(tenantId: string): Promise<Record<string, string>>
     Authorization: `Bearer ${token}`,
     "x-tenant-id": tenantId,
     "Content-Type": "application/json",
+    "x-client-request-id": clientRequestId,
   };
 }
 
@@ -36,8 +37,9 @@ async function parseJsonResponse<T>(response: Response): Promise<T> {
   }
 
   if (!response.ok) {
+    const requestId = response.headers.get("x-request-id");
     const message = (payload as ApiErrorPayload | null)?.error?.message ?? "Falha na API de favoritos";
-    throw new Error(message);
+    throw new Error(requestId ? `${message} (request: ${requestId})` : message);
   }
 
   return payload as T;
@@ -47,7 +49,8 @@ export async function listFavorites(params: {
   customerPhone: string;
   tenantId: string;
 }): Promise<FavoriteApiItem[]> {
-  const headers = await getAuthHeaders(params.tenantId);
+  const clientRequestId = crypto.randomUUID();
+  const headers = await getAuthHeaders(params.tenantId, clientRequestId);
   const query = new URLSearchParams({ customerPhone: params.customerPhone });
   const endpoint = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/favorites-api/favorites?${query.toString()}`;
 
@@ -61,7 +64,8 @@ export async function toggleFavorite(params: {
   productId: string;
   tenantId: string;
 }) {
-  const headers = await getAuthHeaders(params.tenantId);
+  const clientRequestId = crypto.randomUUID();
+  const headers = await getAuthHeaders(params.tenantId, clientRequestId);
   const endpoint = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/favorites-api/favorites`;
 
   const response = await fetch(endpoint, {

@@ -1,8 +1,8 @@
 import { useRealtimeOrders, updateOrderStatus, deleteOrder } from "@/hooks/useOrders";
 import { OrderStatusBadge } from "@/components/OrderStatusBadge";
-import { WeighingModal } from "@/components/WeighingModal";
 import { ReceiptCameraModal } from "@/components/ReceiptCameraModal";
 import { OrderDetailsModal } from "@/components/OrderDetailsModal";
+import { AdjustRealValueModal } from "@/components/AdjustRealValueModal";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   Leaf,
@@ -10,7 +10,6 @@ import {
   Truck,
   CheckCircle,
   Clock,
-  PhoneCall,
   MapPin,
   RefreshCw,
   KeyRound,
@@ -18,9 +17,12 @@ import {
   Check,
   Trash2,
   AlertTriangle,
-  Scale,
   Camera,
   Eye,
+  MessageCircle,
+  Send,
+  X,
+  PencilLine,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
@@ -31,6 +33,12 @@ import { logAuditEvent } from "@/hooks/useAuditLog";
 import { useTenant } from "@/contexts/TenantContext";
 
 type StatusFilter = "all" | "pending" | "preparing" | "ready_for_delivery" | "delivering" | "delivered";
+
+type QuickChatMessage = {
+  author: "admin" | "client" | "delivery";
+  message: string;
+  created_at: string;
+};
 
 export default function Admin() {
   const { store: tenantStore } = useTenant();
@@ -48,9 +56,13 @@ export default function Admin() {
   const [allowDeleteDelivered, setAllowDeleteDelivered] = useState(false);
   const [deletingOrder, setDeletingOrder] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
-  const [weighingOrder, setWeighingOrder] = useState<any | null>(null);
   const [receiptOrder, setReceiptOrder] = useState<any | null>(null);
   const [detailsOrder, setDetailsOrder] = useState<any | null>(null);
+  const [adjustOrder, setAdjustOrder] = useState<any | null>(null);
+  const [chatOrder, setChatOrder] = useState<any | null>(null);
+  const [chatMessage, setChatMessage] = useState("");
+  const [sendingChat, setSendingChat] = useState(false);
+  const [chatMessages, setChatMessages] = useState<QuickChatMessage[]>([]);
   const navigate = useNavigate();
 
   // Use TenantContext — no more manual store resolution
@@ -145,6 +157,108 @@ export default function Admin() {
       toast.error("Erro ao excluir pedido");
     } finally {
       setDeletingOrder(null);
+    }
+  };
+
+  const quickChatTemplates = [
+    "Pedido recebido e em preparação.",
+    "Pedido saiu para entrega.",
+    "Entregador está chegando ao endereço.",
+    "Poderia confirmar ponto de referência?",
+  ];
+
+  useEffect(() => {
+    if (!chatOrder?.id) {
+      setChatMessages([]);
+      return;
+    }
+
+    const loadChatMessages = async () => {
+      const { data } = await (supabase as any)
+        .from("order_tracking")
+        .select("notes, created_at")
+        .eq("order_id", chatOrder.id)
+        .order("created_at", { ascending: true });
+
+      const parsedMessages = ((data as Array<{ notes: string | null; created_at: string }> | null) ?? [])
+        .filter((row) => {
+          const notes = row.notes ?? "";
+          return (
+            notes.startsWith("[CHAT-ADMIN]") ||
+            notes.startsWith("[CHAT-CLIENTE]") ||
+            notes.startsWith("[CHAT-ENTREGADOR-ADMIN]")
+          );
+        })
+        .map((row) => {
+          const notes = row.notes ?? "";
+          if (notes.startsWith("[CHAT-ADMIN]")) {
+            return {
+              author: "admin" as const,
+              message: notes.replace("[CHAT-ADMIN]", "").trim(),
+              created_at: row.created_at,
+            };
+          }
+
+          if (notes.startsWith("[CHAT-ENTREGADOR-ADMIN]")) {
+            return {
+              author: "delivery" as const,
+              message: notes.replace("[CHAT-ENTREGADOR-ADMIN]", "").trim(),
+              created_at: row.created_at,
+            };
+          }
+
+          return {
+            author: "client" as const,
+            message: notes.replace("[CHAT-CLIENTE]", "").trim(),
+            created_at: row.created_at,
+          };
+        })
+        .filter((row) => row.message.length > 0);
+
+      setChatMessages(parsedMessages.slice(-30));
+    };
+
+    loadChatMessages();
+
+    const channel = supabase
+      .channel(`admin-chat-${chatOrder.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "order_tracking",
+          filter: `order_id=eq.${chatOrder.id}`,
+        },
+        () => {
+          loadChatMessages();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [chatOrder?.id]);
+
+  const handleSendChat = async (message: string) => {
+    if (!chatOrder || !message.trim()) return;
+    setSendingChat(true);
+    try {
+      const { error } = await (supabase as any).from("order_tracking").insert({
+        order_id: chatOrder.id,
+        status: chatOrder.status,
+        notes: `[CHAT-ADMIN] ${message.trim()}`,
+      });
+
+      if (error) throw error;
+      toast.success("Mensagem interna registrada no pedido");
+      setChatMessage("");
+    } catch (error) {
+      console.error(error);
+      toast.error("Não foi possível registrar a mensagem");
+    } finally {
+      setSendingChat(false);
     }
   };
 
@@ -518,11 +632,11 @@ export default function Admin() {
                                 {/* Linha 2: Ações secundárias */}
                                 <div className="grid grid-cols-4 gap-2">
                                   <button
-                                    onClick={() => setWeighingOrder(order)}
-                                    className="h-8 rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors flex items-center justify-center"
-                                    title="Pesar itens"
+                                    onClick={() => setAdjustOrder(order)}
+                                    className="h-8 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors flex items-center justify-center"
+                                    title="Ajustar valor real"
                                   >
-                                    <Scale className="h-3.5 w-3.5" />
+                                    <PencilLine className="h-3.5 w-3.5" />
                                   </button>
                                   <button
                                     onClick={() => setReceiptOrder(order)}
@@ -530,6 +644,13 @@ export default function Admin() {
                                     title="Registrar cupom fiscal"
                                   >
                                     <Camera className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => setChatOrder(order)}
+                                    className="h-8 rounded-lg bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors flex items-center justify-center"
+                                    title="Chat rápido interno"
+                                  >
+                                    <MessageCircle className="h-3.5 w-3.5" />
                                   </button>
                                   <button
                                     onClick={() => handleDeleteOrder(order.id, order.status)}
@@ -549,15 +670,6 @@ export default function Admin() {
                                       <Trash2 className="h-3.5 w-3.5" />
                                     )}
                                   </button>
-                                  <a 
-                                    href={`https://wa.me/55${order.phone.replace(/\D/g, '')}`} 
-                                    target="_blank" 
-                                    rel="noreferrer"
-                                    className="h-8 rounded-lg bg-green-50 text-green-600 border border-green-200 flex items-center justify-center hover:bg-green-100 transition-colors"
-                                    title="Chamar no WhatsApp"
-                                  >
-                                    <PhoneCall className="h-3.5 w-3.5" />
-                                  </a>
                                 </div>
                               </>
                             )}
@@ -575,11 +687,11 @@ export default function Admin() {
                                 {/* Linha 2: Ações secundárias */}
                                 <div className="grid grid-cols-4 gap-2">
                                   <button
-                                    onClick={() => setWeighingOrder(order)}
-                                    className="h-8 rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors flex items-center justify-center"
-                                    title="Pesar itens"
+                                    onClick={() => setAdjustOrder(order)}
+                                    className="h-8 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors flex items-center justify-center"
+                                    title="Ajustar valor real"
                                   >
-                                    <Scale className="h-3.5 w-3.5" />
+                                    <PencilLine className="h-3.5 w-3.5" />
                                   </button>
                                   <button
                                     onClick={() => setReceiptOrder(order)}
@@ -587,6 +699,13 @@ export default function Admin() {
                                     title="Registrar cupom fiscal"
                                   >
                                     <Camera className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => setChatOrder(order)}
+                                    className="h-8 rounded-lg bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors flex items-center justify-center"
+                                    title="Chat rápido interno"
+                                  >
+                                    <MessageCircle className="h-3.5 w-3.5" />
                                   </button>
                                   <button
                                     onClick={() => handleDeleteOrder(order.id, order.status)}
@@ -606,15 +725,6 @@ export default function Admin() {
                                       <Trash2 className="h-3.5 w-3.5" />
                                     )}
                                   </button>
-                                  <a 
-                                    href={`https://wa.me/55${order.phone.replace(/\D/g, '')}`} 
-                                    target="_blank" 
-                                    rel="noreferrer"
-                                    className="h-8 rounded-lg bg-green-50 text-green-600 border border-green-200 flex items-center justify-center hover:bg-green-100 transition-colors"
-                                    title="Chamar no WhatsApp"
-                                  >
-                                    <PhoneCall className="h-3.5 w-3.5" />
-                                  </a>
                                 </div>
                               </>
                             )}
@@ -627,30 +737,39 @@ export default function Admin() {
                                 >
                                   {updating === order.id ? <RefreshCw className="h-3 w-3 animate-spin" /> : <span className="truncate">Enviar 🛵</span>}
                                 </button>
-                                <button
-                                  onClick={() => handleDeleteOrder(order.id, order.status)}
-                                  disabled={deletingOrder === order.id}
-                                  className={`w-full h-8 rounded-lg flex items-center justify-center gap-1 text-xs font-bold transition-colors ${
-                                    confirmDelete === order.id
-                                      ? "bg-red-500 text-white"
-                                      : "bg-red-50 text-red-600 hover:bg-red-100"
-                                  }`}
-                                  title="Excluir pedido"
-                                >
-                                  {deletingOrder === order.id ? (
-                                    <RefreshCw className="h-3 w-3 animate-spin" />
-                                  ) : confirmDelete === order.id ? (
-                                    <>
-                                      <AlertTriangle className="h-3 w-3" />
-                                      <span className="truncate">Confirmar</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Trash2 className="h-3 w-3" />
-                                      <span className="truncate">Excluir</span>
-                                    </>
-                                  )}
-                                </button>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <button
+                                    onClick={() => setChatOrder(order)}
+                                    className="h-8 rounded-lg bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors flex items-center justify-center"
+                                    title="Chat rápido interno"
+                                  >
+                                    <MessageCircle className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteOrder(order.id, order.status)}
+                                    disabled={deletingOrder === order.id}
+                                    className={`h-8 rounded-lg flex items-center justify-center gap-1 text-xs font-bold transition-colors ${
+                                      confirmDelete === order.id
+                                        ? "bg-red-500 text-white"
+                                        : "bg-red-50 text-red-600 hover:bg-red-100"
+                                    }`}
+                                    title="Excluir pedido"
+                                  >
+                                    {deletingOrder === order.id ? (
+                                      <RefreshCw className="h-3 w-3 animate-spin" />
+                                    ) : confirmDelete === order.id ? (
+                                      <>
+                                        <AlertTriangle className="h-3 w-3" />
+                                        <span className="truncate">Confirmar</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Trash2 className="h-3 w-3" />
+                                        <span className="truncate">Excluir</span>
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
                               </>
                             )}
                             {col.id === "delivering" && (
@@ -729,16 +848,6 @@ export default function Admin() {
         )}
       </main>
 
-      {/* Modal de Pesagem */}
-      <WeighingModal
-        order={weighingOrder}
-        onClose={() => setWeighingOrder(null)}
-        onUpdate={() => {
-          // Força recarregar pedidos após pesagem
-          window.location.reload();
-        }}
-      />
-
       {/* Modal de Captura de Cupom */}
       {receiptOrder && (
         <ReceiptCameraModal
@@ -758,6 +867,93 @@ export default function Admin() {
         order={detailsOrder}
         onClose={() => setDetailsOrder(null)}
       />
+
+      {/* Modal de ajuste de valor real */}
+      <AdjustRealValueModal
+        order={adjustOrder}
+        onClose={() => setAdjustOrder(null)}
+        onSuccess={() => {
+          setAdjustOrder(null);
+          window.location.reload();
+        }}
+      />
+
+      {/* Modal de chat rápido interno */}
+      {chatOrder && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-card w-full max-w-md rounded-2xl border border-border shadow-xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-extrabold text-foreground">Chat rápido interno</h3>
+                <p className="text-xs text-muted-foreground">
+                  Pedido #{chatOrder.id.split("-")[0]} · {chatOrder.customer_name}
+                </p>
+              </div>
+              <button
+                onClick={() => setChatOrder(null)}
+                className="h-8 w-8 rounded-lg bg-muted hover:bg-accent flex items-center justify-center"
+                title="Fechar"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2">
+              <div className="max-h-44 overflow-y-auto space-y-2 border border-border rounded-lg p-2 bg-muted/30">
+                {chatMessages.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Sem mensagens ainda.</p>
+                ) : (
+                  chatMessages.map((msg, idx) => (
+                    <div
+                      key={`${msg.created_at}-${idx}`}
+                      className={`rounded-lg px-3 py-2 text-xs ${
+                        msg.author === "admin"
+                          ? "bg-blue-50 text-blue-800 border border-blue-200 ml-6"
+                          : msg.author === "delivery"
+                            ? "bg-emerald-50 text-emerald-900 border border-emerald-200 mr-6"
+                            : "bg-amber-50 text-amber-900 border border-amber-200 mr-6"
+                      }`}
+                    >
+                      <p className="font-bold mb-0.5">
+                        {msg.author === "admin" ? "Loja" : msg.author === "delivery" ? "Entregador" : "Cliente"}
+                      </p>
+                      <p>{msg.message}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {quickChatTemplates.map((template) => (
+                <button
+                  key={template}
+                  onClick={() => handleSendChat(template)}
+                  disabled={sendingChat}
+                  className="h-9 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold hover:bg-blue-100 transition-colors px-3 text-left"
+                >
+                  {template}
+                </button>
+              ))}
+            </div>
+
+            <div className="space-y-2">
+              <textarea
+                value={chatMessage}
+                onChange={(e) => setChatMessage(e.target.value)}
+                placeholder="Mensagem livre (opcional)"
+                className="w-full min-h-20 rounded-lg border border-border px-3 py-2 text-sm bg-card"
+              />
+              <button
+                onClick={() => handleSendChat(chatMessage)}
+                disabled={sendingChat || !chatMessage.trim()}
+                className="w-full h-9 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center gap-1"
+              >
+                <Send className="h-3.5 w-3.5" />
+                Enviar mensagem
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

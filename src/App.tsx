@@ -16,8 +16,6 @@ import AdminPreparation from "./pages/AdminPreparation";
 import OrderTracking from "./pages/OrderTracking";
 import CustomerTracking from "./pages/CustomerTracking";
 import Delivery from "./pages/Delivery";
-import AdminDirectDelivery from "./pages/AdminDirectDelivery";
-import DirectDeliveryTracking from "./pages/DirectDeliveryTracking";
 import SuperAdmin from "./pages/SuperAdmin";
 import ResetPassword from "./pages/ResetPassword";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -41,7 +39,6 @@ const App = () => (
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/track" element={<OrderTracking />} />
-          <Route path="/delivery-tracking" element={<DirectDeliveryTracking />} />
           <Route path="/superadmin" element={<SuperAdmin />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/delivery" element={<Delivery />} />
@@ -55,8 +52,6 @@ const App = () => (
           <Route path="/admin/delivery-zones" element={<ProtectedRoute><AdminDeliveryZones /></ProtectedRoute>} />
           <Route path="/admin/analytics" element={<ProtectedRoute><AdminAnalytics /></ProtectedRoute>} />
           <Route path="/admin/preparation" element={<ProtectedRoute><AdminPreparation /></ProtectedRoute>} />
-          <Route path="/admin/direct-delivery" element={<ProtectedRoute><AdminDirectDelivery /></ProtectedRoute>} />
-
           {/* ── Entregador por loja ── */}
           <Route path="/:slug/delivery" element={<Delivery />} />
           

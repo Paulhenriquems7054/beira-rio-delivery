@@ -17,6 +17,12 @@ interface HandlerDeps {
     context: RequestContext,
     metadata: { route: string; status: number; duration_ms: number },
   ) => Promise<void>;
+  alertOnError?: (payload: {
+    requestId: string;
+    route: string;
+    status: number;
+    message: string;
+  }) => Promise<void>;
 }
 
 export function resolveRoute(request: Request) {
@@ -27,19 +33,21 @@ export function resolveRoute(request: Request) {
   return { method: request.method.toUpperCase(), routeParts, url };
 }
 
-function jsonResponse(status: number, body: unknown): Response {
+function jsonResponse(status: number, body: unknown, requestId: string): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
       "content-type": "application/json; charset=utf-8",
       "x-powered-by": "favorites-api-edge",
       "access-control-allow-origin": "*",
+      "x-request-id": requestId,
     },
   });
 }
 
 export function createFavoritesHttpHandler(deps: HandlerDeps) {
   return async (request: Request): Promise<Response> => {
+    const fallbackRequestId = crypto.randomUUID();
     if (request.method === "OPTIONS") {
       return new Response("ok", {
         headers: {
@@ -56,7 +64,7 @@ export function createFavoritesHttpHandler(deps: HandlerDeps) {
       context = await deps.buildContext(request);
     } catch (error) {
       const mapped = toErrorResponse(error);
-      return jsonResponse(mapped.status, mapped.body);
+      return jsonResponse(mapped.status, mapped.body, fallbackRequestId);
     }
 
     const { method, routeParts, url } = resolveRoute(request);
@@ -82,6 +90,16 @@ export function createFavoritesHttpHandler(deps: HandlerDeps) {
       status: result.status,
       duration_ms: Date.now() - start,
     });
-    return jsonResponse(result.status, result.body);
+
+    if (result.status >= 500 && deps.alertOnError) {
+      await deps.alertOnError({
+        requestId: context.requestId,
+        route: routeKey,
+        status: result.status,
+        message: "favorites-api internal error",
+      });
+    }
+
+    return jsonResponse(result.status, result.body, context.requestId);
   };
 }

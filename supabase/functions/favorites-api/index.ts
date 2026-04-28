@@ -9,6 +9,7 @@ import { writeAuditLog } from "./_shared/audit.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+const ALERT_WEBHOOK_URL = Deno.env.get("ALERT_WEBHOOK_URL");
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error("Missing required Supabase env vars");
@@ -27,6 +28,22 @@ Deno.serve(
         status: metadata.status,
         duration_ms: metadata.duration_ms,
       });
+    },
+    alertOnError: async (payload) => {
+      if (!ALERT_WEBHOOK_URL) return;
+      try {
+        await fetch(ALERT_WEBHOOK_URL, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            service: "favorites-api",
+            ...payload,
+            timestamp: new Date().toISOString(),
+          }),
+        });
+      } catch (error) {
+        console.error("[favorites-api] alert webhook failed", error);
+      }
     },
   }),
 );

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { X, Camera, Upload, Check, RotateCcw, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { createWorker } from "tesseract.js";
 
 interface ReceiptCameraModalProps {
   orderId: string;
@@ -22,9 +23,60 @@ export function ReceiptCameraModal({
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [receiptTotal, setReceiptTotal] = useState<string>(orderTotal.toFixed(2));
+  const [isReadingReceipt, setIsReadingReceipt] = useState(false);
+  const [ocrSuggestionApplied, setOcrSuggestionApplied] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const extractTotalFromText = (text: string): string | null => {
+    const normalized = text
+      .replace(/\r/g, "\n")
+      .replace(/[^\S\n]+/g, " ")
+      .toUpperCase();
+
+    const amountRegex = /(\d{1,4}(?:[.,]\d{3})*[.,]\d{2})/g;
+    const lines = normalized.split("\n").map((line) => line.trim()).filter(Boolean);
+
+    const priorityLines = lines.filter((line) =>
+      /(TOTAL|VALOR TOTAL|TOTAL A PAGAR|TOTAL R\$|TOTAL RS|R\$)/.test(line)
+    );
+
+    const candidateLines = [...priorityLines, ...lines];
+    for (const line of candidateLines) {
+      const matches = [...line.matchAll(amountRegex)];
+      if (matches.length > 0) {
+        const raw = matches[matches.length - 1][1];
+        return raw.replace(/\./g, "").replace(",", ".");
+      }
+    }
+
+    return null;
+  };
+
+  const readReceiptTotalWithOcr = async (imageData: string) => {
+    setIsReadingReceipt(true);
+    setOcrSuggestionApplied(false);
+    try {
+      const worker = await createWorker("por");
+      const { data } = await worker.recognize(imageData);
+      await worker.terminate();
+
+      const extractedValue = extractTotalFromText(data.text || "");
+      if (extractedValue) {
+        setReceiptTotal(extractedValue);
+        setOcrSuggestionApplied(true);
+        toast.success(`Valor sugerido automaticamente: R$ ${Number(extractedValue).toFixed(2).replace(".", ",")}`);
+      } else {
+        toast.info("Não consegui identificar o total automaticamente. Confirme manualmente.");
+      }
+    } catch (error) {
+      console.error("Erro ao ler cupom com OCR:", error);
+      toast.info("Leitura automática indisponível. Digite o valor manualmente.");
+    } finally {
+      setIsReadingReceipt(false);
+    }
+  };
 
   useEffect(() => {
     if (mode === 'camera') {
@@ -79,6 +131,7 @@ export function ReceiptCameraModal({
     setCapturedImage(imageData);
     setMode('preview');
     stopCamera();
+    readReceiptTotalWithOcr(imageData);
   };
 
   const retakePhoto = () => {
@@ -97,9 +150,11 @@ export function ReceiptCameraModal({
 
     const reader = new FileReader();
     reader.onload = (e) => {
-      setCapturedImage(e.target?.result as string);
+      const imageData = e.target?.result as string;
+      setCapturedImage(imageData);
       setMode('preview');
       stopCamera();
+      readReceiptTotalWithOcr(imageData);
     };
     reader.readAsDataURL(file);
   };
@@ -111,7 +166,8 @@ export function ReceiptCameraModal({
 
     try {
       // Valida o valor do cupom
-      const receiptValue = parseFloat(receiptTotal);
+      const normalizedReceiptTotal = receiptTotal.replace(",", ".");
+      const receiptValue = parseFloat(normalizedReceiptTotal);
       if (!receiptValue || receiptValue <= 0) {
         toast.error('Por favor, informe o valor total do cupom');
         setMode('preview');
@@ -246,10 +302,20 @@ export function ReceiptCameraModal({
               </div>
 
               <div>
-                <label className="text-sm font-bold text-foreground mb-2 block flex items-center gap-2">
+                <label className="text-sm font-bold text-foreground mb-2 flex items-center gap-2">
                   <span className="text-red-500">*</span>
                   Valor Total do Cupom (R$)
                 </label>
+                {isReadingReceipt && (
+                  <p className="text-xs text-blue-600 dark:text-blue-400 mb-2 font-semibold">
+                    Lendo valor automaticamente do cupom...
+                  </p>
+                )}
+                {ocrSuggestionApplied && !isReadingReceipt && (
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-2 font-semibold">
+                    Valor preenchido automaticamente. Confira antes de confirmar.
+                  </p>
+                )}
                 <input
                   type="text"
                   inputMode="decimal"

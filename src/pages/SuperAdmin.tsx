@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Shield, Users, Lock, Unlock, RefreshCw, LogOut,
   CheckCircle2, XCircle, Clock, AlertTriangle, Search,
-  ChevronDown, ChevronUp, Loader2,
+  ChevronDown, ChevronUp, Loader2, Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -305,10 +305,19 @@ function PinScreen({ onUnlock }: { onUnlock: () => void }) {
 }
 
 // ─── Store Card ───────────────────────────────────────────────────────────────
-function StoreCard({ store, onRefresh }: { store: Store; onRefresh: () => void }) {
+function StoreCard({
+  store,
+  onRefresh,
+  onDeleted,
+}: {
+  store: Store;
+  onRefresh: () => void;
+  onDeleted: (storeId: string) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const [events, setEvents] = useState<SubEvent[]>([]);
   const [loading, setLoading] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [blockReason, setBlockReason] = useState("");
   const [plan, setPlan] = useState(store.subscription_plan || "basic");
   const [expiresAt, setExpiresAt] = useState(
@@ -382,6 +391,35 @@ function StoreCard({ store, onRefresh }: { store: Store; onRefresh: () => void }
     toast.success("Plano atualizado");
     setLoading(false);
     onRefresh();
+  };
+
+  const handleDeleteStore = async () => {
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      toast.warning("Clique novamente em Excluir Loja para confirmar");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-delete-store", {
+        body: { storeId: store.id },
+      });
+      if (error) throw error;
+      if (!data?.success) {
+        throw new Error(data?.error?.message || "Falha ao excluir loja");
+      }
+
+      toast.success("Loja excluída com sucesso");
+      setConfirmDelete(false);
+      onDeleted(store.id);
+      onRefresh();
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error?.message || "Erro ao excluir loja");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const isBlocked = store.subscription_status === "blocked";
@@ -475,6 +513,39 @@ function StoreCard({ store, onRefresh }: { store: Store; onRefresh: () => void }
                   {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Lock className="h-3.5 w-3.5" /> Bloquear</>}
                 </button>
               </div>
+            )}
+          </div>
+
+          {/* Excluir Loja (irreversível) */}
+          <div className="space-y-2">
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Zona de Risco</p>
+            <button
+              onClick={handleDeleteStore}
+              disabled={loading}
+              className={`w-full h-10 rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60 ${
+                confirmDelete
+                  ? "bg-red-600 text-white hover:bg-red-700"
+                  : "bg-red-100 text-red-700 hover:bg-red-200"
+              }`}
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : confirmDelete ? (
+                <>
+                  <AlertTriangle className="h-4 w-4" />
+                  Confirmar exclusão
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4" />
+                  Excluir Loja
+                </>
+              )}
+            </button>
+            {confirmDelete && (
+              <p className="text-xs text-red-600">
+                Esta ação remove a loja e dados relacionados. Não poderá ser desfeita.
+              </p>
             )}
           </div>
 
@@ -608,7 +679,12 @@ export default function SuperAdmin() {
 
         <div className="space-y-3">
           {filtered.map(store => (
-            <StoreCard key={store.id} store={store} onRefresh={loadStores} />
+            <StoreCard
+              key={store.id}
+              store={store}
+              onRefresh={loadStores}
+              onDeleted={(storeId) => setStores((prev) => prev.filter((s) => s.id !== storeId))}
+            />
           ))}
         </div>
       </main>

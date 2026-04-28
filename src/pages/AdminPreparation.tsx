@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Loader2, Scale, Eye, PackageCheck, Camera, User, Weight, Play, DollarSign } from "lucide-react";
+import { ArrowLeft, Loader2, Scale, Eye, PackageCheck, Camera, User, Weight, Play, DollarSign, PencilLine } from "lucide-react";
 import { toast } from "sonner";
 import { useTenant } from "@/contexts/TenantContext";
 import { useRealtimeOrders, updateOrderStatus } from "@/hooks/useOrders";
-import { WeighingModal } from "@/components/WeighingModal";
 import { OrderDetailsModal } from "@/components/OrderDetailsModal";
 import { ReceiptCameraModal } from "@/components/ReceiptCameraModal";
 import { ReceiptValueModal } from "@/components/ReceiptValueModal";
+import { AdjustRealValueModal } from "@/components/AdjustRealValueModal";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 type RoleTab = "separator" | "scale";
@@ -18,15 +18,15 @@ export default function AdminPreparation() {
   const { orders, loading } = useRealtimeOrders(store?.id);
   const [activeTab, setActiveTab] = useState<RoleTab>("separator");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [weighingOrder, setWeighingOrder] = useState<any | null>(null);
   const [detailsOrder, setDetailsOrder] = useState<any | null>(null);
   const [receiptOrder, setReceiptOrder] = useState<any | null>(null);
   const [valueOrder, setValueOrder] = useState<any | null>(null);
+  const [adjustOrder, setAdjustOrder] = useState<any | null>(null);
 
   // Pedidos para Separador: status pending (aguardando separação)
   const separatorOrders = orders.filter((o) => o.status === "pending");
   
-  // Pedidos para Balança: status preparing (em separação, precisa pesar)
+  // Pedidos para Conferência de Caixa: status preparing
   const scaleOrders = orders.filter((o) => o.status === "preparing");
 
   const handleStatus = async (orderId: string, status: string) => {
@@ -58,7 +58,7 @@ export default function AdminPreparation() {
           <div className="flex-1">
             <h1 className="text-base font-extrabold text-white leading-tight">Separação de Pedidos</h1>
             <p className="text-xs text-white/75">
-              {activeTab === "separator" ? "Separar produtos dos pedidos" : "Pesar e registrar no caixa"}
+              {activeTab === "separator" ? "Separar produtos dos pedidos" : "Conferir e ajustar no caixa"}
             </p>
           </div>
           <ThemeToggle className="bg-white/20 text-white hover:bg-white/30" />
@@ -208,7 +208,7 @@ export default function AdminPreparation() {
                   {order.address}
                 </p>
 
-                {/* Botões da Balança */}
+                {/* Botões da Conferência de Caixa */}
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={() => setDetailsOrder(order)}
@@ -217,10 +217,10 @@ export default function AdminPreparation() {
                     <Eye className="h-4 w-4" /> Ver Itens
                   </button>
                   <button
-                    onClick={() => setWeighingOrder(order)}
+                    onClick={() => setAdjustOrder(order)}
                     className="h-11 rounded-lg bg-amber-100 text-amber-700 text-xs font-bold flex items-center justify-center gap-1 hover:bg-amber-200"
                   >
-                    <Scale className="h-4 w-4" /> Pesar
+                    <PencilLine className="h-4 w-4" /> Ajustar
                   </button>
                   <button
                     onClick={() => setValueOrder(order)}
@@ -244,17 +244,18 @@ export default function AdminPreparation() {
       </main>
 
       {/* Modais */}
-      <WeighingModal
-        order={weighingOrder}
-        onClose={() => setWeighingOrder(null)}
-        onUpdate={() => {
-          setWeighingOrder(null);
-        }}
-      />
-
       <OrderDetailsModal
         order={detailsOrder}
         onClose={() => setDetailsOrder(null)}
+      />
+
+      <AdjustRealValueModal
+        order={adjustOrder}
+        onClose={() => setAdjustOrder(null)}
+        onSuccess={() => {
+          setAdjustOrder(null);
+          toast.success("Ajuste de valor real registrado");
+        }}
       />
 
       {receiptOrder && (

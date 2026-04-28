@@ -84,6 +84,31 @@ export default function Index() {
     return calculateCartEstimate(basket.products, cart, weightCart, productMode);
   }, [basket?.products, cart, weightCart, productMode]);
 
+  // Subtotal confirmado: itens por peso + itens por unidade com preço fixo.
+  // Itens por unidade com estimativa entram apenas no total estimado.
+  const confirmedSubtotal = useMemo(() => {
+    if (!basket?.products) return 0;
+
+    return basket.products.reduce((sum, product) => {
+      const sellBy = product.sell_by || "unit";
+      const mode = sellBy === "both" ? (productMode[product.id] || "unit") : sellBy;
+
+      if (mode === "weight") {
+        const kg = weightCart[product.id] || 0;
+        return sum + kg * (product.price_per_kg ?? product.price);
+      }
+
+      const qty = cart[product.id] || 0;
+      if (qty <= 0) return sum;
+
+      if (sellsByUnitFixedPrice(product)) {
+        return sum + qty * product.price;
+      }
+
+      return sum;
+    }, 0);
+  }, [basket?.products, cart, weightCart, productMode]);
+
   // Total confirmado (apenas itens por peso) - para compatibilidade
   const cartTotal = cartEstimates.weightItemsTotal;
 
@@ -549,7 +574,7 @@ export default function Index() {
             <CheckoutForm
               loading={createOrder.isPending}
               basketName={basket.name}
-              basketPrice={cartTotal}
+              basketPrice={confirmedSubtotal}
               storeId={store.id}
               estimatedTotal={cartEstimates.totalEstimate}
               hasUnitItems={itemsByUnit > 0}
@@ -589,7 +614,7 @@ export default function Index() {
                 createOrder.mutate(
                   {
                     ...data,
-                    total: data.total_with_fee || cartTotal,
+                    total: data.total_with_fee,
                     products: selectedProducts,
                     storeId: store.id,
                     delivery_zone_id: data.neighborhood_id,
@@ -601,7 +626,7 @@ export default function Index() {
                   {
                     onSuccess: (order) => {
                       toast.success("Pedido enviado com sucesso! 🎉");
-                      setConfirmedTotal(data.total_with_fee || cartTotal);
+                      setConfirmedTotal(data.total_with_fee);
                       setConfirmedItems(selectedProducts); // Salvar itens confirmados
                       setConfirmedOrderId(order.id); // Salvar ID do pedido
                       setConfirmedPhone(data.phone); // Salvar telefone

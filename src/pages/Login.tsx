@@ -115,7 +115,7 @@ export default function Login() {
         if (slug.length < 3) return toast.error("O link da loja precisa ter pelo menos 3 caracteres");
         
         // Slugs reservados — não podem ser usados como nome de loja
-        const RESERVED = ["admin","login","track","delivery","superadmin","delivery-tracking","api","static","public"];
+        const RESERVED = ["admin","login","track","delivery","superadmin","api","static","public"];
         const formattedSlug = slug.toLowerCase().replace(/[^a-z0-9-]/g, "");
         if (RESERVED.includes(formattedSlug)) {
             return toast.error("Esse link é reservado. Escolha outro nome.");

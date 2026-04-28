@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, MapPin, Clock, CheckCircle2, ChefHat, Bike, Leaf, ArrowLeft } from "lucide-react";
+import { Package, MapPin, Clock, CheckCircle2, ChefHat, Bike, Leaf, ArrowLeft, Send } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useStoreInfo } from "@/hooks/useStoreInfo";
+import { toast } from "sonner";
 
 type OrderItem = {
   id: string;
@@ -26,6 +27,18 @@ type Order = {
   created_at: string;
   notes?: string;
   order_items?: OrderItem[];
+};
+
+type OrderTrackingRow = {
+  id?: string;
+  notes: string | null;
+  created_at: string;
+};
+
+type ChatMessage = {
+  author: "admin" | "client" | "delivery";
+  message: string;
+  created_at: string;
 };
 
 const STATUS_STEPS = [
@@ -114,6 +127,7 @@ function StatusTimeline({ status }: { status: string }) {
 
 function useRealtimeOrder(orderId: string, phone: string) {
   const [order, setOrder] = useState<Order | null>(null);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -124,6 +138,51 @@ function useRealtimeOrder(orderId: string, phone: string) {
 
     // Normaliza o telefone para garantir compatibilidade
     const normalizedPhone = phone.replace(/\D/g, "");
+
+    const loadChatMessages = async () => {
+      const { data } = await (supabase as any)
+        .from("order_tracking")
+        .select("id, notes, created_at")
+        .eq("order_id", orderId)
+        .order("created_at", { ascending: true });
+
+      const parsedMessages = ((data as OrderTrackingRow[] | null) ?? [])
+        .filter((row) => {
+          const notes = row.notes ?? "";
+          return (
+            notes.startsWith("[CHAT-ADMIN]") ||
+            notes.startsWith("[CHAT-CLIENTE]") ||
+            notes.startsWith("[CHAT-ENTREGADOR-CLIENTE]")
+          );
+        })
+        .map((row) => {
+          const notes = row.notes ?? "";
+          if (notes.startsWith("[CHAT-ADMIN]")) {
+            return {
+              author: "admin" as const,
+              message: notes.replace("[CHAT-ADMIN]", "").trim(),
+              created_at: row.created_at,
+            };
+          }
+
+          if (notes.startsWith("[CHAT-ENTREGADOR-CLIENTE]")) {
+            return {
+              author: "delivery" as const,
+              message: notes.replace("[CHAT-ENTREGADOR-CLIENTE]", "").trim(),
+              created_at: row.created_at,
+            };
+          }
+
+          return {
+            author: "client" as const,
+            message: notes.replace("[CHAT-CLIENTE]", "").trim(),
+            created_at: row.created_at,
+          };
+        })
+        .filter((row) => row.message.length > 0);
+
+      setChatMessages(parsedMessages.slice(-20));
+    };
 
     // Busca inicial com itens
     supabase
@@ -161,6 +220,8 @@ function useRealtimeOrder(orderId: string, phone: string) {
         }
         setLoading(false);
       });
+
+    loadChatMessages();
 
     // Realtime - atualiza status em tempo real
     const channel = supabase
@@ -221,12 +282,24 @@ function useRealtimeOrder(orderId: string, phone: string) {
             });
         }
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "order_tracking",
+          filter: `order_id=eq.${orderId}`,
+        },
+        () => {
+          loadChatMessages();
+        }
+      )
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
   }, [orderId, phone]);
 
-  return { order, loading };
+  return { order, loading, chatMessages };
 }
 
 export default function CustomerTracking() {
@@ -238,7 +311,9 @@ export default function CustomerTracking() {
   const searchParams = new URLSearchParams(window.location.search);
   const phone = searchParams.get('phone') || '';
   
-  const { order, loading } = useRealtimeOrder(orderId || '', phone);
+  const { order, loading, chatMessages } = useRealtimeOrder(orderId || '', phone);
+  const [clientChatMessage, setClientChatMessage] = useState("");
+  const [sendingClientChat, setSendingClientChat] = useState(false);
 
   if (loading) {
     return (
@@ -291,6 +366,31 @@ export default function CustomerTracking() {
       </div>
     );
   }
+
+  const canUseQuickChat = ["pending", "preparing", "ready_for_delivery"].includes(order.status);
+
+  const sendClientMessage = async () => {
+    if (!clientChatMessage.trim()) return;
+
+    setSendingClientChat(true);
+    try {
+      const { error } = await (supabase as any).from("order_tracking").insert({
+        order_id: order.id,
+        status: order.status,
+        notes: `[CHAT-CLIENTE] ${clientChatMessage.trim()}`,
+      });
+
+      if (error) throw error;
+
+      setClientChatMessage("");
+      toast.success("Mensagem enviada para a loja");
+    } catch (error) {
+      console.error(error);
+      toast.error("Não foi possível enviar sua mensagem agora");
+    } finally {
+      setSendingClientChat(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -394,12 +494,14 @@ export default function CustomerTracking() {
                       </p>
                     </div>
                     <p className="font-bold text-primary ml-2">
-                      {item.final_price ? (
+                      {item.final_price != null ? (
                         `R$ ${item.final_price.toFixed(2).replace(".", ",")}`
                       ) : item.sold_by === 'weight' ? (
                         `R$ ${item.price.toFixed(2).replace(".", ",")}`
-                      ) : (
+                      ) : item.needs_weighing ? (
                         <span className="text-amber-600 text-xs">A pesar</span>
+                      ) : (
+                        `R$ ${(item.quantity * item.price).toFixed(2).replace(".", ",")}`
                       )}
                     </p>
                   </div>
@@ -413,6 +515,60 @@ export default function CustomerTracking() {
             <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
               <p className="text-xs font-semibold text-blue-900 mb-1">📝 Observações:</p>
               <p className="text-sm text-blue-800">{order.notes}</p>
+            </div>
+          )}
+
+          {/* Chat rápido com a loja */}
+          {(chatMessages.length > 0 || canUseQuickChat) && (
+            <div className="mb-4 p-3 bg-amber-50 rounded-lg border border-amber-100 space-y-2">
+              <p className="text-xs font-semibold text-amber-900">💬 Chat rápido com a loja</p>
+
+              {chatMessages.length === 0 ? (
+                <p className="text-xs text-amber-700">Sem mensagens por enquanto.</p>
+              ) : (
+                <div className="space-y-2 max-h-44 overflow-y-auto">
+                  {chatMessages.map((msg, idx) => (
+                    <div
+                      key={`${msg.created_at}-${idx}`}
+                      className={`rounded-lg px-3 py-2 text-xs ${
+                        msg.author === "admin"
+                          ? "bg-white border border-amber-200 text-amber-900"
+                          : msg.author === "delivery"
+                            ? "bg-emerald-50 border border-emerald-200 text-emerald-900"
+                          : "bg-blue-50 border border-blue-200 text-blue-900 ml-6"
+                      }`}
+                    >
+                      <p className="font-bold mb-0.5">
+                        {msg.author === "admin" ? "Loja" : msg.author === "delivery" ? "Entregador" : "Você"}
+                      </p>
+                      <p>{msg.message}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {canUseQuickChat ? (
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    value={clientChatMessage}
+                    onChange={(e) => setClientChatMessage(e.target.value)}
+                    placeholder="Digite sua mensagem..."
+                    className="flex-1 h-9 rounded-lg border border-amber-200 bg-white px-3 text-xs"
+                  />
+                  <button
+                    onClick={sendClientMessage}
+                    disabled={sendingClientChat || !clientChatMessage.trim()}
+                    className="h-9 px-3 rounded-lg bg-amber-600 text-white text-xs font-bold hover:bg-amber-700 disabled:opacity-50 flex items-center gap-1"
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    Enviar
+                  </button>
+                </div>
+              ) : (
+                <p className="text-[11px] text-amber-700">
+                  Chat encerrado para este pedido (após "Pronto p/ Entrega").
+                </p>
+              )}
             </div>
           )}
 

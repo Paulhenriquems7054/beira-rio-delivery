@@ -4,6 +4,7 @@ import { useDeliveryZones, type DeliveryZone } from "@/hooks/useDeliveryZones";
 import { useValidateCoupon } from "@/hooks/useCoupons";
 import { toast } from "sonner";
 import { CartEstimateWarning } from "@/components/CartEstimateWarning";
+import { calculateCheckoutPricing } from "@/utils/checkoutPricing";
 
 interface Props {
   loading: boolean;
@@ -80,6 +81,17 @@ export function CheckoutForm({
     }
   }, []);
 
+  // Sincroniza automaticamente o campo "Bairro" com o bairro selecionado na zona de entrega.
+  useEffect(() => {
+    if (!selectedZone || !zones?.length) return;
+    const zone = zones.find((z) => z.id === selectedZone);
+    if (!zone) return;
+    const zoneName = (zone.name || zone.neighborhood || "").trim();
+    if (zoneName) {
+      setNeighborhood(zoneName);
+    }
+  }, [selectedZone, zones]);
+
   const currentZoneData = zones?.find(z => z.id === selectedZone);
   const deliveryFee = currentZoneData ? currentZoneData.fee : 0;
   const couponValidationTotal = Math.max(basketPrice, estimatedTotal || 0);
@@ -94,7 +106,12 @@ export function CheckoutForm({
     }
   }
   
-  const finalTotal = Math.max(0, basketPrice - discount + deliveryFee);
+  const pricing = calculateCheckoutPricing({
+    basketPrice,
+    estimatedTotal,
+    deliveryFee,
+    discount,
+  });
 
   const errors = {
     name: name.trim().length < 2 ? "Informe seu nome completo" : "",
@@ -157,7 +174,8 @@ export function CheckoutForm({
       customer_name: name.trim(),
       phone,
       address: fullAddress,
-      total_with_fee: finalTotal,
+      // Mantém o total persistido alinhado ao total exibido ao cliente.
+      total_with_fee: pricing.displayTotal,
       neighborhood_id: selectedZone || undefined,
       coupon_id: appliedCoupon?.id,
       discount,
@@ -189,17 +207,17 @@ export function CheckoutForm({
           <span className="flex items-center gap-1">
             Subtotal (confirmado):
           </span>
-          <span>R$ {basketPrice.toFixed(2).replace(".", ",")}</span>
+          <span>R$ {pricing.subtotalConfirmed.toFixed(2).replace(".", ",")}</span>
         </div>
         
         {/* Estimativa de itens por unidade */}
-        {hasUnitWeightBasedEstimate && estimatedTotal && estimatedTotal > basketPrice && (
+        {hasUnitWeightBasedEstimate && pricing.estimatedUnitDelta > 0 && (
           <div className="flex justify-between text-sm font-semibold text-amber-600">
             <span className="flex items-center gap-1">
               <Scale className="h-3.5 w-3.5" />
               Estimativa (por unidade):
             </span>
-            <span>+ R$ {(estimatedTotal - basketPrice).toFixed(2).replace(".", ",")}</span>
+            <span>+ R$ {pricing.estimatedUnitDelta.toFixed(2).replace(".", ",")}</span>
           </div>
         )}
         
@@ -225,7 +243,7 @@ export function CheckoutForm({
             )}
           </div>
           <span className="text-2xl font-extrabold text-primary">
-            R$ {(estimatedTotal ? Math.max(0, estimatedTotal - discount + deliveryFee) : finalTotal).toFixed(2).replace(".", ",")}
+            R$ {pricing.displayTotal.toFixed(2).replace(".", ",")}
           </span>
         </div>
         

@@ -37,6 +37,7 @@ describe("favorites edge http integration", () => {
 
     expect(response.status).toBe(401);
     expect(body.error.code).toBe("UNAUTHORIZED");
+    expect(response.headers.get("x-request-id")).toBeTruthy();
   });
 
   it("retorna 401 para tenant invalido/ausente", async () => {
@@ -83,5 +84,31 @@ describe("favorites edge http integration", () => {
     expect(response.status).toBe(403);
     expect(body.error.code).toBe("UNAUTHORIZED");
     expect(auditSpy).toHaveBeenCalledOnce();
+    expect(response.headers.get("x-request-id")).toBe("req-1");
+  });
+
+  it("dispara alerta quando status 500", async () => {
+    const alertSpy = vi.fn(async () => {});
+    const handler = createFavoritesHttpHandler({
+      buildContext: async () => ({
+        requestId: "req-500",
+        userId: "user-1",
+        tenantId: "tenant-1",
+        ipAddress: "127.0.0.1",
+        user: { id: "user-1" } as any,
+      }),
+      controller: {
+        ...controllerStub,
+        list: vi.fn(async () => ({ status: 500, body: { success: false } })),
+      },
+      audit: async () => {},
+      alertOnError: alertSpy,
+    });
+
+    const response = await handler(
+      new Request("http://localhost/functions/v1/favorites-api/favorites", { method: "GET" }),
+    );
+    expect(response.status).toBe(500);
+    expect(alertSpy).toHaveBeenCalledOnce();
   });
 });

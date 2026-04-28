@@ -36,6 +36,18 @@ export function OrderDetailsModal({ order, onClose }: Props) {
   const [items, setItems] = useState<OrderDetailsItem[]>([]);
   const [loading, setLoading] = useState(false);
 
+  const getItemLineTotal = (item: OrderDetailsItem): number => {
+    if (item.sold_by === "weight") {
+      return item.final_price ?? item.price ?? 0;
+    }
+    // Para venda por unidade, "price" representa valor unitário.
+    // Se houver final_price (caso especial), ele tem prioridade.
+    if (typeof item.final_price === "number") {
+      return item.final_price;
+    }
+    return (item.quantity || 0) * (item.price || 0);
+  };
+
   useEffect(() => {
     const loadItems = async () => {
       if (!order) return;
@@ -83,8 +95,12 @@ export function OrderDetailsModal({ order, onClose }: Props) {
   }, [order]);
 
   const itemsTotal = useMemo(
-    () => items.reduce((sum, item) => sum + (item.final_price || item.price || 0), 0),
+    () => items.reduce((sum, item) => sum + getItemLineTotal(item), 0),
     [items]
+  );
+  const computedOrderTotal = useMemo(
+    () => Math.max(0, itemsTotal + (order?.delivery_fee || 0) - (order?.discount || 0)),
+    [itemsTotal, order?.delivery_fee, order?.discount]
   );
 
   if (!order) return null;
@@ -145,7 +161,7 @@ export function OrderDetailsModal({ order, onClose }: Props) {
                             : `${item.quantity} unidade(s)`}
                       </p>
                     </div>
-                    <p className="font-bold text-primary">R$ {(item.final_price || item.price || 0).toFixed(2)}</p>
+                    <p className="font-bold text-primary">R$ {getItemLineTotal(item).toFixed(2)}</p>
                   </div>
                     );
                   })()}
@@ -170,7 +186,7 @@ export function OrderDetailsModal({ order, onClose }: Props) {
           </div>
           <div className="flex justify-between text-base font-extrabold text-foreground pt-1 border-t border-border">
             <span>Total pedido</span>
-            <span>R$ {(order.total || 0).toFixed(2)}</span>
+            <span>R$ {computedOrderTotal.toFixed(2)}</span>
           </div>
         </div>
       </div>
