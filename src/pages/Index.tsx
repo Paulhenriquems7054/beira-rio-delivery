@@ -250,30 +250,43 @@ export default function Index() {
                 <div className="mt-3 space-y-2 max-h-48 overflow-y-auto border-t border-primary/10 pt-3">
                   {confirmedItems.map((item, idx) => (
                     <div key={idx} className="flex justify-between items-start text-sm">
-                      <div className="flex-1">
-                        <p className="font-semibold text-foreground">{item.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {item.sold_by === 'weight' ? (
-                            <>
-                              {item.weight_kg < 1 
-                                ? `${Math.round(item.weight_kg * 1000)}g` 
-                                : `${item.weight_kg.toFixed(2)}kg`}
-                              {' '}× R$ {(item.price_per_kg ?? item.price).toFixed(2).replace(".", ",")}
-                            </>
-                          ) : (
-                            <>
-                              {item.quantity} unidade{item.quantity > 1 ? 's' : ''} (a pesar)
-                            </>
-                          )}
-                        </p>
-                      </div>
-                      <p className="font-bold text-primary ml-2">
-                        {item.sold_by === 'weight' ? (
-                          `R$ ${item.price.toFixed(2).replace(".", ",")}`
-                        ) : (
-                          <span className="text-amber-600 text-xs">A pesar</span>
-                        )}
-                      </p>
+                      {(() => {
+                        const isFixedUnit = item.sold_by === "unit" && sellsByUnitFixedPrice(item);
+                        const unitQty = item.quantity || 1;
+                        const unitLineTotal = unitQty * (item.price || 0);
+
+                        return (
+                          <>
+                            <div className="flex-1">
+                              <p className="font-semibold text-foreground">{item.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {item.sold_by === "weight" ? (
+                                  <>
+                                    {item.weight_kg < 1
+                                      ? `${Math.round(item.weight_kg * 1000)}g`
+                                      : `${item.weight_kg.toFixed(2)}kg`}
+                                    {" "}x R$ {(item.price_per_kg ?? item.price).toFixed(2).replace(".", ",")}
+                                  </>
+                                ) : (
+                                  <>
+                                    {unitQty} unidade{unitQty > 1 ? "s" : ""}
+                                    {!isFixedUnit && " (a pesar)"}
+                                  </>
+                                )}
+                              </p>
+                            </div>
+                            <p className="font-bold text-primary ml-2">
+                              {item.sold_by === "weight" ? (
+                                `R$ ${item.price.toFixed(2).replace(".", ",")}`
+                              ) : isFixedUnit ? (
+                                `R$ ${unitLineTotal.toFixed(2).replace(".", ",")}`
+                              ) : (
+                                <span className="text-amber-600 text-xs">A pesar</span>
+                              )}
+                            </p>
+                          </>
+                        );
+                      })()}
                     </div>
                   ))}
                 </div>
@@ -287,7 +300,7 @@ export default function Index() {
                     R$ {confirmedTotal.toFixed(2).replace(".", ",")}
                   </span>
                 </div>
-                {confirmedItems.some(item => item.sold_by === 'unit') && (
+                {confirmedItems.some(item => item.sold_by === "unit" && !sellsByUnitFixedPrice(item)) && (
                   <p className="text-xs text-amber-600 mt-2">
                     ⚖️ Itens por unidade serão pesados e o valor será atualizado
                   </p>
