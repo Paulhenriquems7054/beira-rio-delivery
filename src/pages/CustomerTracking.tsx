@@ -320,6 +320,7 @@ export default function CustomerTracking() {
   const [clientChatMessage, setClientChatMessage] = useState("");
   const [sendingClientChat, setSendingClientChat] = useState(false);
   const arrivalAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
   const formatWeight = (weightKg: number) =>
     weightKg < 1
       ? `${Math.round(weightKg * 1000)}g`
@@ -337,6 +338,9 @@ export default function CustomerTracking() {
         }
       } catch (error) {
         console.error("Erro ao reproduzir aviso de chegada:", error);
+        if (!audioUnlocked) {
+          toast.info("Toque bloqueado no celular. Toque uma vez na tela para ativar o som.");
+        }
       }
 
       if ("vibrate" in navigator) {
@@ -348,6 +352,36 @@ export default function CustomerTracking() {
 
     playArrivalAlert();
   }, [arrivalAlertTick]);
+
+  useEffect(() => {
+    const unlockAudio = async () => {
+      if (audioUnlocked) return;
+      const audio = arrivalAudioRef.current;
+      if (!audio) return;
+
+      try {
+        // "Acorda" o áudio com gesto do usuário para liberar futuros plays no mobile.
+        const wasMuted = audio.muted;
+        audio.muted = true;
+        audio.currentTime = 0;
+        await audio.play();
+        audio.pause();
+        audio.currentTime = 0;
+        audio.muted = wasMuted;
+        setAudioUnlocked(true);
+      } catch {
+        // Mantém silencioso: tentará desbloquear novamente no próximo gesto.
+      }
+    };
+
+    window.addEventListener("touchstart", unlockAudio, { passive: true });
+    window.addEventListener("click", unlockAudio);
+
+    return () => {
+      window.removeEventListener("touchstart", unlockAudio);
+      window.removeEventListener("click", unlockAudio);
+    };
+  }, [audioUnlocked]);
 
   if (loading) {
     return (
