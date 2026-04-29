@@ -1,6 +1,7 @@
 import { useRealtimeOrders, updateOrderStatus, deleteOrder } from "@/hooks/useOrders";
 import { OrderStatusBadge } from "@/components/OrderStatusBadge";
 import { ReceiptCameraModal } from "@/components/ReceiptCameraModal";
+import { ReceiptValueModal } from "@/components/ReceiptValueModal";
 import { OrderDetailsModal } from "@/components/OrderDetailsModal";
 import { AdjustRealValueModal } from "@/components/AdjustRealValueModal";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -57,6 +58,7 @@ export default function Admin() {
   const [deletingOrder, setDeletingOrder] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [receiptOrder, setReceiptOrder] = useState<any | null>(null);
+  const [receiptValueOrder, setReceiptValueOrder] = useState<any | null>(null);
   const [detailsOrder, setDetailsOrder] = useState<any | null>(null);
   const [adjustOrder, setAdjustOrder] = useState<any | null>(null);
   const [chatOrder, setChatOrder] = useState<any | null>(null);
@@ -630,13 +632,20 @@ export default function Admin() {
                                 </button>
                                 
                                 {/* Linha 2: Ações secundárias */}
-                                <div className="grid grid-cols-4 gap-2">
+                                <div className="grid grid-cols-5 gap-2">
                                   <button
                                     onClick={() => setAdjustOrder(order)}
                                     className="h-8 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors flex items-center justify-center"
                                     title="Ajustar valor real"
                                   >
                                     <PencilLine className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => setReceiptValueOrder(order)}
+                                    className="h-8 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors flex items-center justify-center"
+                                    title="Registrar apenas valor (sem foto)"
+                                  >
+                                    <DollarSign className="h-3.5 w-3.5" />
                                   </button>
                                   <button
                                     onClick={() => setReceiptOrder(order)}
@@ -685,13 +694,20 @@ export default function Admin() {
                                 </button>
                                 
                                 {/* Linha 2: Ações secundárias */}
-                                <div className="grid grid-cols-4 gap-2">
+                                <div className="grid grid-cols-5 gap-2">
                                   <button
                                     onClick={() => setAdjustOrder(order)}
                                     className="h-8 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors flex items-center justify-center"
                                     title="Ajustar valor real"
                                   >
                                     <PencilLine className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => setReceiptValueOrder(order)}
+                                    className="h-8 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors flex items-center justify-center"
+                                    title="Registrar apenas valor (sem foto)"
+                                  >
+                                    <DollarSign className="h-3.5 w-3.5" />
                                   </button>
                                   <button
                                     onClick={() => setReceiptOrder(order)}
@@ -857,6 +873,20 @@ export default function Admin() {
           onClose={() => setReceiptOrder(null)}
           onSuccess={() => {
             setReceiptOrder(null);
+            window.location.reload();
+          }}
+        />
+      )}
+
+      {/* Modal de valor manual sem foto */}
+      {receiptValueOrder && (
+        <ReceiptValueModal
+          orderId={receiptValueOrder.id}
+          customerName={receiptValueOrder.customer_name}
+          orderTotal={receiptValueOrder.total}
+          onClose={() => setReceiptValueOrder(null)}
+          onSuccess={() => {
+            setReceiptValueOrder(null);
             window.location.reload();
           }}
         />
