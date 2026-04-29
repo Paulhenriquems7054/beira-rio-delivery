@@ -23,9 +23,10 @@ import {
   Send,
   X,
   PencilLine,
+  Bell,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { LogOut, DollarSign } from "lucide-react";
@@ -39,6 +40,32 @@ type QuickChatMessage = {
   message: string;
   created_at: string;
 };
+
+function playAdminNotificationSound() {
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(880, ctx.currentTime);
+    oscillator.frequency.setValueAtTime(1046.5, ctx.currentTime + 0.08);
+
+    gainNode.gain.setValueAtTime(0.001, ctx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 0.02);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    oscillator.start();
+    oscillator.stop(ctx.currentTime + 0.26);
+  } catch {
+    // ignore audio errors (browser restrictions, etc.)
+  }
+}
 
 export default function Admin() {
   const { store: tenantStore } = useTenant();
@@ -63,6 +90,10 @@ export default function Admin() {
   const [chatMessage, setChatMessage] = useState("");
   const [sendingChat, setSendingChat] = useState(false);
   const [chatMessages, setChatMessages] = useState<QuickChatMessage[]>([]);
+  const [unreadOrderIds, setUnreadOrderIds] = useState<Set<string>>(new Set());
+  const [showNotifications, setShowNotifications] = useState(false);
+  const initializedOrdersRef = useRef(false);
+  const previousOrderIdsRef = useRef<Set<string>>(new Set());
   const navigate = useNavigate();
 
   // Use TenantContext — no more manual store resolution
@@ -264,6 +295,40 @@ export default function Admin() {
 
   const filtered = filter === "all" ? orders : orders.filter((o) => o.status === filter);
 
+  useEffect(() => {
+    const currentIds = new Set(orders.map((o) => o.id));
+
+    if (!initializedOrdersRef.current) {
+      previousOrderIdsRef.current = currentIds;
+      initializedOrdersRef.current = true;
+      return;
+    }
+
+    const newOrders = orders.filter((order) => !previousOrderIdsRef.current.has(order.id));
+    if (newOrders.length > 0) {
+      setUnreadOrderIds((prev) => {
+        const next = new Set(prev);
+        newOrders.forEach((order) => next.add(order.id));
+        return next;
+      });
+      playAdminNotificationSound();
+      toast.success(`${newOrders.length} novo(s) pedido(s) recebido(s)!`);
+    }
+
+    previousOrderIdsRef.current = currentIds;
+  }, [orders]);
+
+  const unreadNotifications = orders
+    .filter((order) => unreadOrderIds.has(order.id))
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+  const handleToggleNotifications = () => {
+    setShowNotifications((prev) => !prev);
+    if (!showNotifications) {
+      setUnreadOrderIds(new Set());
+    }
+  };
+
   const counts = {
     all: orders.length,
     pending: orders.filter((o) => o.status === "pending").length,
@@ -317,6 +382,49 @@ export default function Admin() {
             <div className="flex items-center gap-1.5 bg-white/20 dark:bg-slate-800/50 rounded-full px-3 py-1">
               <span className="h-2 w-2 rounded-full bg-emerald-300 animate-pulse-dot" />
               <span className="text-xs font-bold text-white hidden sm:inline">Ao vivo</span>
+            </div>
+            <div className="relative">
+              <button
+                onClick={handleToggleNotifications}
+                className="relative h-8 w-8 rounded-full bg-white/10 dark:bg-slate-800/50 flex items-center justify-center text-white hover:bg-white/20 dark:hover:bg-slate-700/50 transition-colors"
+                title="Notificações de pedidos"
+              >
+                <Bell className="h-4 w-4" />
+                {unreadNotifications.length > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-extrabold flex items-center justify-center">
+                    {unreadNotifications.length > 9 ? "9+" : unreadNotifications.length}
+                  </span>
+                )}
+              </button>
+
+              {showNotifications && (
+                <div className="absolute right-0 mt-2 w-80 max-w-[90vw] rounded-xl border border-border bg-card shadow-xl p-2 z-50">
+                  <p className="px-2 py-1 text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    Novos pedidos
+                  </p>
+                  <div className="max-h-72 overflow-y-auto">
+                    {unreadNotifications.length === 0 ? (
+                      <p className="px-2 py-3 text-sm text-muted-foreground">Sem novas notificações.</p>
+                    ) : (
+                      unreadNotifications.map((order) => (
+                        <button
+                          key={order.id}
+                          onClick={() => {
+                            setDetailsOrder(order);
+                            setShowNotifications(false);
+                          }}
+                          className="w-full text-left px-2 py-2 rounded-lg hover:bg-muted transition-colors"
+                        >
+                          <p className="text-sm font-bold text-foreground">{order.customer_name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Pedido #{order.id.split("-")[0]} · R$ {order.total.toFixed(2).replace(".", ",")}
+                          </p>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
             <ThemeToggle />
             <button
